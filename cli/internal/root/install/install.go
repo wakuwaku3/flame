@@ -31,10 +31,9 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 		return err
 	}
 	prevByInstall := indexLockFilesByInstall(prevLock)
-	mergeArrayBy := indexMergeArrayByInstall(prevLock)
 	newLock := &Lock{Installed: nil, Files: nil, Embeds: nil}
 	for _, item := range plan.Items {
-		if execErr := executeItem(ctx, repoRoot, m, item, prevByInstall, mergeArrayBy, newLock); execErr != nil {
+		if execErr := executeItem(ctx, repoRoot, m, item, prevByInstall, newLock); execErr != nil {
 			return execErr
 		}
 	}
@@ -67,7 +66,7 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-func executeItem(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, prevByInstall map[string]LockFile, mergeArrayBy map[string]MergeArrayStrategy, newLock *Lock) error {
+func executeItem(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, prevByInstall map[string]LockFile, newLock *Lock) error {
 	if feat := featureForInstall(item.InstallPath, item.Kind); m.IsIgnored(feat) {
 		return nil
 	}
@@ -82,7 +81,7 @@ func executeItem(ctx context.Context, repoRoot string, m *Manifest, item PlanIte
 	case PlanKindTriggerWorkflow:
 		return executeTriggerWorkflow(ctx, repoRoot, m, item)
 	case PlanKindInstallCopy:
-		return executeInstallCopy(ctx, repoRoot, m, item, prevByInstall, mergeArrayBy, newLock)
+		return executeInstallCopy(ctx, repoRoot, m, item, prevByInstall, newLock)
 	case PlanKindUnknown:
 		return ex.Errorf("unknown plan kind for %s", item.VendorPath)
 	default:
@@ -111,7 +110,7 @@ func executeTriggerWorkflow(ctx context.Context, repoRoot string, m *Manifest, i
 	return writeWritable(ctx, installAbs, pinned)
 }
 
-func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, prevByInstall map[string]LockFile, mergeArrayBy map[string]MergeArrayStrategy, newLock *Lock) error {
+func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, prevByInstall map[string]LockFile, newLock *Lock) error {
 	vendorAbs := filepath.Join(repoRoot, item.VendorPath)
 	installAbs := filepath.Join(repoRoot, item.InstallPath)
 	vendorBytes, err := os.ReadFile(vendorAbs)
@@ -123,7 +122,6 @@ func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item 
 		return err
 	}
 	prevEntry := prevByInstall[filepath.ToSlash(item.InstallPath)]
-	arrayStrategy := mergeArrayBy[filepath.ToSlash(item.InstallPath)]
 	out, mergeErr := Merge3Way(&Merge3WayInput{
 		Strategy:     item.Merge,
 		InstallPath:  item.InstallPath,
@@ -160,7 +158,6 @@ func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item 
 		Content:       string(merged),
 		VendorContent: string(vendorBytes),
 		Overlay:       nil,
-		MergeArray:    arrayStrategy,
 	}
 	switch {
 	case overlayPath != "":
@@ -267,15 +264,6 @@ func formatConflictError(installPath string, conflicts []MergeConflict) error {
 	return ex.Errorf("%s", b.String())
 }
 
-func indexMergeArrayByInstall(prev *Lock) map[string]MergeArrayStrategy {
-	out := map[string]MergeArrayStrategy{}
-	for _, f := range prev.Files {
-		if f.MergeArray != "" {
-			out[f.Install] = f.MergeArray
-		}
-	}
-	return out
-}
 
 func sortLockFiles(lock *Lock) {
 	sort.SliceStable(lock.Files, func(i, j int) bool {

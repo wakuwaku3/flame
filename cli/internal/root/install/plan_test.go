@@ -63,23 +63,21 @@ func TestSkipVendorPath(t *testing.T) {
 	cases := []struct {
 		name      string
 		vendorRel string
-		isSelf    bool
 		wantSkip  bool
 	}{
-		{name: "devbox.lock は常に skip", vendorRel: "vendor/flame/devbox.lock", isSelf: false, wantSkip: true},
-		{name: ".github/workflows/tests/ は常に skip", vendorRel: "vendor/flame/.github/workflows/tests/x.sh", isSelf: false, wantSkip: true},
-		{name: "devbox/init.sh は vendor 直接参照のため skip", vendorRel: "vendor/flame/devbox/init.sh", isSelf: false, wantSkip: true},
-		{name: "self mode で docs/adr/ は skip (stub 経路)", vendorRel: "vendor/flame/docs/adr/general/X.md", isSelf: true, wantSkip: true},
-		{name: "self mode で .claude/rules/ は skip (stub 経路)", vendorRel: "vendor/flame/.claude/rules/x.md", isSelf: true, wantSkip: true},
-		{name: "downstream mode で docs/adr/ は install copy", vendorRel: "vendor/flame/docs/adr/general/X.md", isSelf: false, wantSkip: false},
-		{name: "downstream mode で .claude/rules/ は install copy", vendorRel: "vendor/flame/.claude/rules/x.md", isSelf: false, wantSkip: false},
-		{name: "通常の lint config は skip しない", vendorRel: "vendor/flame/.golangci.yaml", isSelf: true, wantSkip: false},
+		{name: "devbox.lock は skip", vendorRel: "vendor/flame/devbox.lock", wantSkip: true},
+		{name: ".github/workflows/tests/ は skip", vendorRel: "vendor/flame/.github/workflows/tests/x.sh", wantSkip: true},
+		{name: "devbox/init.sh は vendor 直接参照のため skip", vendorRel: "vendor/flame/devbox/init.sh", wantSkip: true},
+		{name: "schemas/ は skip (vendor SoT 直接参照)", vendorRel: "vendor/flame/schemas/flame.yaml.schema.yaml", wantSkip: true},
+		{name: "docs/adr/ は install copy (skip しない、 必要なら ignore: [adr] で制御)", vendorRel: "vendor/flame/docs/adr/general/X.md", wantSkip: false},
+		{name: ".claude/rules/ は install copy (skip しない、 必要なら ignore: [claude/rules] で制御)", vendorRel: "vendor/flame/.claude/rules/x.md", wantSkip: false},
+		{name: "通常の lint config は skip しない", vendorRel: "vendor/flame/.golangci.yaml", wantSkip: false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := skipVendorPath(tc.vendorRel, tc.isSelf)
+			got := skipVendorPath(tc.vendorRel)
 			assert.Equal(t, tc.wantSkip, got)
 		})
 	}

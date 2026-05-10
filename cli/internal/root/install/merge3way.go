@@ -21,6 +21,9 @@ type Merge3WayInput struct {
 	OurContent   []byte
 }
 
+// keyValueStep は YAML mapping node の Content slice を 2 要素ずつ (key, value) で walk するステップ幅。
+const keyValueStep = 2
+
 // MergeConflict は 3-way merge で base / their / our の差分が両立しない位置を表す。 path は "." 区切りの YAML / JSON path。 sequence 内の conflict は path 末尾に "[i]" を付与する。
 type MergeConflict struct {
 	Path        string

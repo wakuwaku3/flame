@@ -35,19 +35,19 @@ func TestMakeVendorReadOnly(t *testing.T) {
 func TestSyncVendor_ErrorPaths(t *testing.T) {
 	t.Parallel()
 
-	t.Run("self mode で vendor 不在は error", func(t *testing.T) {
+	t.Run("vendor-sync ignored で vendor 不在は error (self mode の典型ケース)", func(t *testing.T) {
 		t.Parallel()
-		// Arrange
+		// Arrange: ADR FLM_FEA_0003 §source 提供元 repo の特例 で「version 値と ignore directive の重複検査を持たない」 と決定済のため、 self mode の挙動も `flame.ignore: [vendor-sync]` 経由で同等に表現される。
 		root := t.TempDir()
-		m := &Manifest{Source: "github.com/wakuwaku3/flame", Version: SelfVersion, Ignore: nil, Stage1ExtraAgents: nil}
+		m := &Manifest{Source: "github.com/wakuwaku3/flame", Version: SelfVersion, Ignore: map[Feature]struct{}{FeatureVendorSync: {}}, Stage1ExtraAgents: nil}
 		// Act
 		err := SyncVendor(context.Background(), root, m, &Lock{Installed: nil, Files: nil, Embeds: nil})
 		// Assert
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "vendor SoT not found in self mode")
+		assert.Contains(t, err.Error(), "vendor-sync` is ignored")
 	})
 
-	t.Run("vendor-sync ignored で vendor 不在は error", func(t *testing.T) {
+	t.Run("downstream version + vendor-sync ignored で vendor 不在も error", func(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		root := t.TempDir()

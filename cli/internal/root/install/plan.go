@@ -100,7 +100,7 @@ func BuildPlan(_ context.Context, repoRoot string, m *Manifest) (*Plan, error) {
 		if _, ok := embedSet[relSlash]; ok {
 			return nil
 		}
-		if skipVendorPath(relSlash, m.IsSelf()) {
+		if skipVendorPath(relSlash) {
 			return nil
 		}
 		installRel, kind := resolveInstallPath(relSlash)
@@ -158,7 +158,8 @@ func resolveInstallPath(vendorRel string) (installPath string, kind PlanKind) {
 	return relUnderVendor, PlanKindInstallCopy
 }
 
-func skipVendorPath(vendorRel string, isSelf bool) bool {
+// skipVendorPath は vendor SoT 内に存在するが install 経路を取らない resource を判定する (= devbox.lock / GitHub Actions test scripts / devbox 補助 / schemas/)。 source 提供元 repo の特例 (= docs/adr / .claude/rules を install しない経路) は ADR FLM_FEA_0003 §決定 §source 提供元 repo の特例 で「version 値と ignore directive の重複検査を持たない」 と規定されたため、 当該 skip は `flame.ignore` の `adr` / `claude/rules` 機能 ID 経由で表現する (= 本関数では isSelf 引数を持たない)。
+func skipVendorPath(vendorRel string) bool {
 	relUnderVendor := strings.TrimPrefix(vendorRel, VendorRoot+"/")
 	if relUnderVendor == vendorRel {
 		return true
@@ -173,14 +174,6 @@ func skipVendorPath(vendorRel string, isSelf bool) bool {
 	case strings.HasPrefix(relUnderVendor, "schemas/"):
 		// schemas/ は flame install の install 経路を取らず、 利用側 / source 提供元 repo の双方が vendor SoT を直接参照する (FLM_FEA_0003 §schema の機械可読化、 `tests/shared/` と同じ運用)。
 		return true
-	}
-	if isSelf {
-		switch {
-		case strings.HasPrefix(relUnderVendor, "docs/adr/"):
-			return true
-		case strings.HasPrefix(relUnderVendor, ".claude/rules/"):
-			return true
-		}
 	}
 	return false
 }

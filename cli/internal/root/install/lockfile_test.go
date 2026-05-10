@@ -36,7 +36,6 @@ func TestLockRoundTrip(t *testing.T) {
 						Path:    ".golangci.flame-overlay.yaml",
 						Content: "linters: {disable: []}\n",
 					},
-					MergeArray: "",
 				},
 			},
 			Embeds: []install.LockEmbed{

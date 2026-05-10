@@ -12,15 +12,9 @@ import (
 	"github.com/wakuwaku3/flame/lib/ex"
 )
 
-// SyncVendor は manifest の `flame.source` / `version` に基づき vendor/flame/ を最新化する。 version が `self` の場合は当該 repo の working tree が SoT のため fetch を行わず、 vendor/flame/ の存在のみ確認する。 それ以外は前回 install 時の installed.{source, version} と manifest の現在値を比較し、 不一致なら既存 vendor を削除して再 clone する。 一致または初回 install の場合は git clone で source repo を temp dir に取得し vendor/flame/ subdirectory を repo root の vendor/flame/ に sync する (FLM_FEA_0003 §チャネル C: vendor sync は version 単位の fetch + repo-local idempotent 適用)。 clone 直後に vendor 配下を chmod 444 (file) / 555 (dir) で readonly 化し、 利用者が誤って vendor を直接編集する経路を OS 層で塞ぐ。 manifest で `vendor-sync` または `vendor-readonly` が ignore されている場合は該当工程を skip する。
+// SyncVendor は manifest の `flame.source` / `version` に基づき vendor/flame/ を最新化する。 `flame.ignore` に `vendor-sync` を含む場合 (= source 提供元 repo は ADR FLM_FEA_0003 §機能単位 ignore §source 提供元 repo の特例 でこの宣言を必須化、 利用側が独自経路で vendor 管理する場合も同様) は fetch を行わず vendor の存在のみ確認する。 それ以外は前回 install 時の installed.{source, version} と manifest の現在値を比較し、 不一致なら既存 vendor を削除して再 clone する。 一致または初回 install の場合は git clone で source repo を temp dir に取得し vendor/flame/ subdirectory を repo root の vendor/flame/ に sync する。 clone 直後に vendor 配下を chmod 444 (file) / 555 (dir) で readonly 化し、 利用者が誤って vendor を直接編集する経路を OS 層で塞ぐ (FLM_FEA_0003 §vendor の load 時 readonly。 manifest で `vendor-readonly` が ignore されていれば readonly 化を skip)。 ADR §決定 §source 提供元 repo の特例 で「version 値 (= self か否か) と ignore directive の重複検査を持たない」 と規定されているため、 self 判定経路は持たない (= self mode の挙動はすべて `flame.ignore` の明示宣言で表現する)。
 func SyncVendor(ctx context.Context, repoRoot string, m *Manifest, prev *Lock) error {
 	vendorAbs := filepath.Join(repoRoot, VendorRoot)
-	if m.IsSelf() {
-		if _, err := os.Stat(vendorAbs); err != nil {
-			return ex.Wrapf(err, "vendor SoT not found in self mode (working tree must contain %s): %s", VendorRoot, vendorAbs)
-		}
-		return nil
-	}
 	if m.IsIgnored(FeatureVendorSync) {
 		if _, err := os.Stat(vendorAbs); err != nil {
 			return ex.Wrapf(err, "vendor not found and `vendor-sync` is ignored (provide vendor manually): %s", vendorAbs)

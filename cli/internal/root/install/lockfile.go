@@ -24,18 +24,6 @@ const (
 	MergeReplace MergeStrategy = "replace"
 )
 
-// MergeArrayStrategy は構造化 deep merge 時の配列扱い。
-type MergeArrayStrategy string
-
-const (
-	// MergeArrayAppend は vendor 末尾に overlay を連結。
-	MergeArrayAppend MergeArrayStrategy = "append"
-	// MergeArrayReplace は overlay の配列で全置換。
-	MergeArrayReplace MergeArrayStrategy = "replace"
-	// MergeArrayUnique は append + 重複除去。
-	MergeArrayUnique MergeArrayStrategy = "unique"
-)
-
 // LockOverlay は副ファイル overlay の lockfile 表現。 path に加え 3-way merge の base material として前回 install 時点の overlay 内容 snapshot を持つ (FLM_FEA_0003 §flame.lock)。
 type LockOverlay struct {
 	Path    string `yaml:"path"`
@@ -51,13 +39,12 @@ type LockInstalled struct {
 
 // LockFile は flame.lock.files[] の 1 entry。 install copy 経路で配置された各ファイルのレコード。 vendor_content は 3-way merge の base (= 前回 install 時点の vendor file 内容 snapshot) として用いる。
 type LockFile struct {
-	Install       string             `yaml:"install"`
-	Vendor        string             `yaml:"vendor"`
-	Merge         MergeStrategy      `yaml:"merge"`
-	Content       string             `yaml:"content"`
-	VendorContent string             `yaml:"vendor_content,omitempty"`
-	Overlay       *LockOverlay       `yaml:"overlay,omitempty"`
-	MergeArray    MergeArrayStrategy `yaml:"merge_array,omitempty"`
+	Install       string        `yaml:"install"`
+	Vendor        string        `yaml:"vendor"`
+	Merge         MergeStrategy `yaml:"merge"`
+	Content       string        `yaml:"content"`
+	VendorContent string        `yaml:"vendor_content,omitempty"`
+	Overlay       *LockOverlay  `yaml:"overlay,omitempty"`
 }
 
 // LockEmbed は flame.lock.embeds[] の 1 entry。 取り込み形式 (CLAUDE.md / .envrc / .yamllint) の install 先と vendor target / 取り込み snippet を記録する (FLM_GEN_0007 §repo root における downstream resource の取り込み形式)。
@@ -182,9 +169,6 @@ func buildFileNode(f *LockFile) *yaml.Node {
 			overlayFields = append(overlayFields, scalarNode("content"), literalBlockNode(f.Overlay.Content))
 		}
 		fields = append(fields, scalarNode("overlay"), mappingNode(overlayFields))
-	}
-	if f.MergeArray != "" {
-		fields = append(fields, scalarNode("merge_array"), scalarNode(string(f.MergeArray)))
 	}
 	return mappingNode(fields)
 }

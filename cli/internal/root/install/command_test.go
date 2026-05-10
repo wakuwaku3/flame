@@ -165,6 +165,12 @@ func TestRun(t *testing.T) {
 		err := install.Run(context.Background(), root, os.Stdout, os.Stderr)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
+		// conflict marker が overlay 副ファイルに書き戻されていることを確認 (= 利用者が解決する経路の成立)
+		marker := mustRead(t, filepath.Join(root, ".shellcheckrc.flame-overlay"))
+		assert.Contains(t, string(marker), "<<<<<<< OURS")
+		assert.Contains(t, string(marker), "=======")
+		assert.Contains(t, string(marker), ">>>>>>> THEIRS")
+		assert.Contains(t, string(marker), "# flame install: 3-way merge conflict")
 	})
 }
 

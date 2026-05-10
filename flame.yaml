@@ -24,6 +24,13 @@ flame:
     # 本リポジトリでは vendor/flame/ を編集しながら開発するため、 clone 後の
     # readonly 化 (chmod 444) は適用しない。
     - vendor-readonly
+    # 本リポジトリでは vendor/flame/docs/adr/ が ADR の SoT そのもので、
+    # 別 path への install copy は drift を生むため install copy 工程を skip。
+    - adr
+    # 本リポジトリでは vendor/flame/.claude/rules/ が rule の SoT そのもので、
+    # install 先 stub (.claude/rules/flame-*.md) は手動配置運用のため install
+    # copy 工程を skip。
+    - claude/rules
   ai:
     pre_push:
       # `flame ai hook pre-push` の段階 1 並列レビューに repo-local な
