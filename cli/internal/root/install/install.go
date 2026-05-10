@@ -42,15 +42,17 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 	if err := WriteLock(ctx, repoRoot, newLock); err != nil {
 		return err
 	}
-	if err := applyReadOnly(ctx, repoRoot, plan); err != nil {
-		return err
+	if !m.IsIgnored(FeatureReadOnly) {
+		if err := applyReadOnly(ctx, repoRoot, m, plan); err != nil {
+			return err
+		}
 	}
-	if !m.SkipGitignore() {
+	if !m.IsIgnored(FeatureGitignore) {
 		if err := applyGitignore(ctx, repoRoot); err != nil {
 			return err
 		}
 	}
-	if !m.SkipPluginInstall() {
+	if !m.IsIgnored(FeatureClaudePlugins) {
 		if err := applyPluginMarketplace(ctx, repoRoot, m.Source); err != nil {
 			return err
 		}
@@ -61,6 +63,9 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 }
 
 func executeItem(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, overlayBy map[string]LockOverlay, mergeArrayBy map[string]MergeArrayStrategy, newLock *Lock) error {
+	if feat := featureForInstall(item.InstallPath, item.Kind); m.IsIgnored(feat) {
+		return nil
+	}
 	switch item.Kind {
 	case PlanKindEmbed:
 		entry, err := applyEmbed(ctx, repoRoot, item)
@@ -220,10 +225,13 @@ func sortLockFiles(lock *Lock) {
 	})
 }
 
-// applyReadOnly は install copy / trg__ scaffold の install 先を chmod 444 で確定させる (FLM_FEA_0003 §install 先の read-only 強制)。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期 file IO のみ。
-func applyReadOnly(_ context.Context, repoRoot string, plan *Plan) error {
+// applyReadOnly は install copy / trg__ scaffold の install 先を chmod 444 で確定させる (FLM_FEA_0003 §install 先の read-only 強制)。 manifest で個別 Feature が ignore されている entry は元々 install されていないため対象外。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期 file IO のみ。
+func applyReadOnly(_ context.Context, repoRoot string, m *Manifest, plan *Plan) error {
 	for _, item := range plan.Items {
 		if item.Kind == PlanKindEmbed {
+			continue
+		}
+		if m.IsIgnored(featureForInstall(item.InstallPath, item.Kind)) {
 			continue
 		}
 		path := filepath.Join(repoRoot, item.InstallPath)

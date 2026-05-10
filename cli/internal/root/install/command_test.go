@@ -69,7 +69,7 @@ func TestRun(t *testing.T) {
 		root := t.TempDir()
 		writeFixtureRepo(t, root, "self")
 		// flame self の特例: ignore で skip
-		writeFlameYAML(t, root, "self", []string{".gitignore", ".claude/plugins"})
+		writeFlameYAML(t, root, "self", []string{"gitignore", "claude/plugins"})
 
 		// Act
 		err := install.Run(context.Background(), root, os.Stdout, os.Stderr)

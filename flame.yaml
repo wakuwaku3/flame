@@ -11,13 +11,19 @@ flame:
     # 本リポジトリは flame harness の source 提供元のため vendor/flame/ を
     # commit する (本来 install 先 repo は vendor/flame/ を .gitignore 登録
     # するべきだが、 source 提供元では適用しないことを示すマーカー)。
-    - .gitignore
+    - gitignore
     # 本リポジトリは flame plugin の source 提供元 (= .claude-plugin/ が SoT)
     # のため、 利用側 repo に対する `/plugin marketplace add wakuwaku3/flame`
     # + `/plugin install flame@flame` 経由の plugin install 工程は適用しない
     # (代わりに .claude/settings.json の extraKnownMarketplaces で当該 repo
     # 自身を local marketplace 登録する形を採用する) ことを示すマーカー。
-    - .claude/plugins
+    - claude/plugins
+    # 本リポジトリでは vendor/flame/ が working tree (SoT) そのもののため、
+    # release artifact からの再 fetch 経路は適用しない。
+    - vendor-sync
+    # 本リポジトリでは vendor/flame/ を編集しながら開発するため、 clone 後の
+    # readonly 化 (chmod 444) は適用しない。
+    - vendor-readonly
   ai:
     pre_push:
       # `flame ai hook pre-push` の段階 1 並列レビューに repo-local な

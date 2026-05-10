@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"gopkg.in/yaml.v3"
 
@@ -12,12 +13,6 @@ import (
 
 // SelfVersion は flame harness の source 提供元 repo (= flame self) を示す flame.yaml の特別 marker。 release artifact 取得経路ではなく working tree の vendor SoT を直接コピーする経路を CLI に取らせる (FLM_FEA_0003 §flame.yaml manifest)。
 const SelfVersion = "self"
-
-// IgnoreGitignore は `flame install` の `.gitignore` 自動登録工程を skip する marker。 flame self は vendor/flame/ を commit する責務があるため (FLM_FEA_0003 §flame.yaml manifest)。
-const IgnoreGitignore = ".gitignore"
-
-// IgnorePluginInstall は Claude Code plugin marketplace 登録 + plugin install の自動工程を skip する marker。 flame self は repo 自身が plugin の source 提供元のため (FLM_FEA_0003 §flame.yaml manifest)。
-const IgnorePluginInstall = ".claude/plugins"
 
 type manifestFile struct {
 	Flame manifestRoot `yaml:"flame"`
@@ -42,11 +37,11 @@ type manifestPrePush struct {
 type Manifest struct {
 	Source            string
 	Version           string
-	Ignore            map[string]struct{}
+	Ignore            map[Feature]struct{}
 	Stage1ExtraAgents []string
 }
 
-// LoadManifest は repo root の flame.yaml を読み取って Manifest を返す。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期 file IO のみ。
+// LoadManifest は repo root の flame.yaml を読み取って Manifest を返す。 ignore に未知の Feature 値が含まれていれば error にする (typo / 古い ID 名を即時検出する)。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期 file IO のみ。
 func LoadManifest(_ context.Context, repoRoot string) (*Manifest, error) {
 	path := filepath.Join(repoRoot, "flame.yaml")
 	data, err := os.ReadFile(path)
@@ -63,9 +58,14 @@ func LoadManifest(_ context.Context, repoRoot string) (*Manifest, error) {
 	if raw.Flame.Version == "" {
 		return nil, ex.Errorf("flame.yaml: flame.version is required")
 	}
-	ignore := make(map[string]struct{}, len(raw.Flame.Ignore))
+	known := knownFeatureSet()
+	ignore := make(map[Feature]struct{}, len(raw.Flame.Ignore))
 	for _, k := range raw.Flame.Ignore {
-		ignore[k] = struct{}{}
+		f := Feature(k)
+		if _, ok := known[f]; !ok {
+			return nil, ex.Errorf("flame.yaml: unknown ignore feature %q (known: %v)", k, sortedFeatureNames())
+		}
+		ignore[f] = struct{}{}
 	}
 	return &Manifest{
 		Source:            raw.Flame.Source,
@@ -80,14 +80,30 @@ func (m *Manifest) IsSelf() bool {
 	return m.Version == SelfVersion
 }
 
-// SkipGitignore は `.gitignore` 自動登録工程を skip すべきかを返す。
-func (m *Manifest) SkipGitignore() bool {
-	_, ok := m.Ignore[IgnoreGitignore]
+// IsIgnored は manifest の ignore に当該 Feature が含まれているかを返す。
+func (m *Manifest) IsIgnored(f Feature) bool {
+	if f == "" {
+		return false
+	}
+	_, ok := m.Ignore[f]
 	return ok
 }
 
-// SkipPluginInstall は Claude Code plugin marketplace 登録 + plugin install を skip すべきかを返す。
-func (m *Manifest) SkipPluginInstall() bool {
-	_, ok := m.Ignore[IgnorePluginInstall]
-	return ok
+func knownFeatureSet() map[Feature]struct{} {
+	all := AllFeatures()
+	out := make(map[Feature]struct{}, len(all))
+	for _, f := range all {
+		out[f] = struct{}{}
+	}
+	return out
+}
+
+func sortedFeatureNames() []string {
+	all := AllFeatures()
+	names := make([]string, len(all))
+	for i, f := range all {
+		names[i] = string(f)
+	}
+	sort.Strings(names)
+	return names
 }
