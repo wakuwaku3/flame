@@ -104,7 +104,7 @@ func merge3WayYAML(in *Merge3WayInput) (*Merge3WayOutput, error) {
 }
 
 func merge3WayYAMLNodes(base, their, our *yaml.Node, path string) (*yaml.Node, []MergeConflict) {
-	if base.Kind == yaml.DocumentNode && their.Kind == yaml.DocumentNode && our.Kind == yaml.DocumentNode {
+	if base != nil && base.Kind == yaml.DocumentNode && their.Kind == yaml.DocumentNode && our.Kind == yaml.DocumentNode {
 		merged, conflicts := merge3WayYAMLNodes(base.Content[0], their.Content[0], our.Content[0], path)
 		out := *base
 		out.Content = []*yaml.Node{merged}
@@ -112,15 +112,15 @@ func merge3WayYAMLNodes(base, their, our *yaml.Node, path string) (*yaml.Node, [
 	}
 	switch {
 	case their.Kind == yaml.MappingNode && our.Kind == yaml.MappingNode:
-		baseMapNode := base
-		if baseMapNode.Kind != yaml.MappingNode {
-			baseMapNode = nil
+		var baseMapNode *yaml.Node
+		if base != nil && base.Kind == yaml.MappingNode {
+			baseMapNode = base
 		}
 		return merge3WayYAMLMapping(baseMapNode, their, our, path)
 	case their.Kind == yaml.SequenceNode && our.Kind == yaml.SequenceNode:
-		baseSeqNode := base
-		if baseSeqNode.Kind != yaml.SequenceNode {
-			baseSeqNode = nil
+		var baseSeqNode *yaml.Node
+		if base != nil && base.Kind == yaml.SequenceNode {
+			baseSeqNode = base
 		}
 		return merge3WayYAMLSequence(baseSeqNode, their, our, path)
 	default:

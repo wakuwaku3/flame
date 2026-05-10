@@ -144,6 +144,66 @@ func TestMerge3Way_YAML_Mapping_VendorAddsKey(t *testing.T) {
 	})
 }
 
+func TestMerge3Way_YAML_Mapping_OverlayRemovesKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("vendor 不変 + overlay が key 削除 → 利用者の削除を尊重 (key が消える)", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		input := &Merge3WayInput{
+			Strategy:     MergeDeep,
+			InstallPath:  "x.yaml",
+			BaseContent:  []byte("a: 1\nb: 2\n"),
+			TheirContent: []byte("a: 1\nb: 2\n"),
+			OurContent:   []byte("a: 1\n"),
+		}
+		// Act
+		out, err := Merge3Way(input)
+		// Assert
+		require.NoError(t, err)
+		assert.Empty(t, out.Conflicts)
+		assert.NotContains(t, string(out.Content), "b:")
+	})
+
+	t.Run("vendor が key 削除 + overlay は base と等価で kept → conflict なしで overlay 値を維持", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		input := &Merge3WayInput{
+			Strategy:     MergeDeep,
+			InstallPath:  "x.yaml",
+			BaseContent:  []byte("a: 1\nb: 2\n"),
+			TheirContent: []byte("a: 1\n"),
+			OurContent:   []byte("a: 1\nb: 2\n"),
+		}
+		// Act
+		out, err := Merge3Way(input)
+		// Assert: overlay = 「最終形」 semantics により、 利用者が overlay に b を残している以上は kept (conflict 出さず key 維持)
+		require.NoError(t, err)
+		assert.Empty(t, out.Conflicts)
+		assert.Contains(t, string(out.Content), "b: 2")
+	})
+}
+
+func TestMerge3Way_YAML_NestedScalar_NoBase_Conflict(t *testing.T) {
+	t.Parallel()
+
+	// Arrange: ネストした key の base が存在しないが their / our 双方が異なる値で追加 → conflict
+	input := &Merge3WayInput{
+		Strategy:     MergeDeep,
+		InstallPath:  "x.yaml",
+		BaseContent:  []byte("root:\n  shared: 1\n"),
+		TheirContent: []byte("root:\n  shared: 1\n  new: 2\n"),
+		OurContent:   []byte("root:\n  shared: 1\n  new: 99\n"),
+	}
+	// Act
+	out, err := Merge3Way(input)
+	// Assert
+	require.NoError(t, err)
+	require.Len(t, out.Conflicts, 1)
+	assert.Equal(t, "root.new", out.Conflicts[0].Path)
+	assert.Contains(t, out.Conflicts[0].Description, "no base")
+}
+
 func TestMerge3Way_JSON_VendorAddsKey(t *testing.T) {
 	t.Parallel()
 
