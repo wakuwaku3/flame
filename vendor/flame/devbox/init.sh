@@ -7,11 +7,10 @@
 
 set -euo pipefail
 
-# CI では既に `Install flame CLI` step (`go build` from PR head、 もしくは
-# `cli/scripts/install.sh` 経由の release asset 取得) が flame を `~/.local/bin/`
-# に配置済の状態で `devbox run` を呼ぶ。 ここで init_hook が再度 install.sh を
-# 走らせると PR head から build した flame バイナリを release 版で上書きしてしまう
-# ため、 既に flame が PATH 上にある場合は skip する (idempotent 化)。
+# init_hook 起動時点で既に flame が install 済のケース (= 先行 install step や
+# 既存の開発環境で別経路から install されている等) では、 ここで再度 install.sh
+# を走らせると既存バイナリを上書きする副作用がある。 既に flame が PATH 上に
+# ある場合は skip する (idempotent 化)。
 if command -v flame >/dev/null 2>&1; then
   exit 0
 fi
