@@ -3,6 +3,7 @@ package yaml_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,17 @@ import (
 
 func TestRun(t *testing.T) {
 	t.Parallel()
+
+	// writeFlameYAMLSchema は TestRun 内の subtest からのみ参照される helper のため、
+	// FLM_APP_0009 §test 内 identifier scope に従い関数 scope の closure として宣言する。
+	writeFlameYAMLSchema := func(tb testing.TB, dir, content string) string {
+		tb.Helper()
+		schemasDir := filepath.Join(dir, "vendor", "flame", "schemas")
+		require.NoError(tb, os.MkdirAll(schemasDir, 0o750))
+		path := filepath.Join(schemasDir, "foo.yaml.schema.yaml")
+		require.NoError(tb, os.WriteFile(path, []byte(content), 0o600))
+		return path
+	}
 
 	t.Run("全て妥当な YAML ファイルなら no-op success", func(t *testing.T) {
 		t.Parallel()
@@ -121,5 +133,206 @@ func TestRun(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, 2, code)
 		fake.Verify(t, "", expectedStderr)
+	})
+
+	t.Run("flame schema 併設 + directive 正常 + conforms なら success", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		dir := t.TempDir()
+		writeFlameYAMLSchema(t, dir, `---
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+required:
+  - hello
+additionalProperties: false
+properties:
+  hello:
+    type: string
+`)
+		target := filepath.Join(dir, "foo.yaml")
+		require.NoError(t, os.WriteFile(target, []byte(`---
+# yaml-language-server: $schema=./vendor/flame/schemas/foo.yaml.schema.yaml
+hello: world
+`), 0o600))
+		r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
+		r.AddCommand(yaml.New())
+		fake := clix.NewFakeIO(t, []string{"yaml", target})
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		require.NoError(t, err)
+		fake.Verify(t, "", "")
+	})
+
+	t.Run("flame schema 併設 + directive 不在なら FAIL", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		dir := t.TempDir()
+		schemaPath := writeFlameYAMLSchema(t, dir, `---
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  hello:
+    type: string
+`)
+		target := filepath.Join(dir, "foo.yaml")
+		require.NoError(t, os.WriteFile(target, []byte("hello: world\n"), 0o600))
+		r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
+		r.AddCommand(yaml.New())
+		fake := clix.NewFakeIO(t, []string{"yaml", target})
+		expectedStderr := "FAIL: " + target + ": missing yaml-language-server $schema directive (flame schema available at " + schemaPath + ")\n"
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		code, ok := clix.ExitCodeOf(err)
+		require.True(t, ok)
+		assert.Equal(t, 1, code)
+		fake.Verify(t, "", expectedStderr)
+	})
+
+	t.Run("flame schema 併設 + directive が別 path を指すと FAIL", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		dir := t.TempDir()
+		schemaPath := writeFlameYAMLSchema(t, dir, `---
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+`)
+		target := filepath.Join(dir, "foo.yaml")
+		require.NoError(t, os.WriteFile(target, []byte(`---
+# yaml-language-server: $schema=./other.schema.yaml
+hello: world
+`), 0o600))
+		r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
+		r.AddCommand(yaml.New())
+		fake := clix.NewFakeIO(t, []string{"yaml", target})
+		expectedDirective := filepath.Join(dir, "other.schema.yaml")
+		expectedStderr := "FAIL: " + target + ": schema directive points to " + expectedDirective + " but flame schema is at " + schemaPath + "\n"
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		code, ok := clix.ExitCodeOf(err)
+		require.True(t, ok)
+		assert.Equal(t, 1, code)
+		fake.Verify(t, "", expectedStderr)
+	})
+
+	t.Run("flame schema 併設 + directive 正常 + conforms せずなら FAIL", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		dir := t.TempDir()
+		writeFlameYAMLSchema(t, dir, `---
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+required:
+  - hello
+additionalProperties: false
+properties:
+  hello:
+    type: string
+`)
+		target := filepath.Join(dir, "foo.yaml")
+		require.NoError(t, os.WriteFile(target, []byte(`---
+# yaml-language-server: $schema=./vendor/flame/schemas/foo.yaml.schema.yaml
+hello: 123
+`), 0o600))
+		r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
+		r.AddCommand(yaml.New())
+		fake := clix.NewFakeIO(t, []string{"yaml", target})
+		// stderr 全体は jsonschema/v6 の error 文面に依存し library version で揺れるため、
+		// production の出力契約として確定している部分 (FAIL prefix + 違反位置 `/hello` の言及)
+		// を 1 行 (`\n$`) として正規表現で全体焼き付けする (FLM_APP_0009 §assertion 規約)。
+		expectedRe := regexp.MustCompile(`(?s)^FAIL: ` + regexp.QuoteMeta(target) + `: schema validation failed:.*'/hello'.*\n$`)
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		code, ok := clix.ExitCodeOf(err)
+		require.True(t, ok)
+		assert.Equal(t, 1, code)
+		// stderr は library version で揺れる文面のため per-channel 検査だが、 stdout 側の漏れを
+		// 検出するため空であることを別途 assert する (FLM_APP_0009 §assertion 規約 の合算検証
+		// default を per-channel 経路でも等価に保つ)。
+		assert.Regexp(t, expectedRe, fake.StderrString(t))
+		assert.Empty(t, fake.StdoutString(t))
+	})
+
+	t.Run("flame schema 併設 + directive が scan 範囲外 (6 行目以降) なら不在扱いで FAIL", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		dir := t.TempDir()
+		schemaPath := writeFlameYAMLSchema(t, dir, `---
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  hello:
+    type: string
+`)
+		target := filepath.Join(dir, "foo.yaml")
+		// directive を意図的に 6 行目に置き、 5 行 scan の境界外として「不在扱い」 になることを焼き付ける。
+		require.NoError(t, os.WriteFile(target, []byte(`---
+# leading comment line 2
+# leading comment line 3
+# leading comment line 4
+# leading comment line 5
+# yaml-language-server: $schema=./vendor/flame/schemas/foo.yaml.schema.yaml
+hello: world
+`), 0o600))
+		r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
+		r.AddCommand(yaml.New())
+		fake := clix.NewFakeIO(t, []string{"yaml", target})
+		expectedStderr := "FAIL: " + target + ": missing yaml-language-server $schema directive (flame schema available at " + schemaPath + ")\n"
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		code, ok := clix.ExitCodeOf(err)
+		require.True(t, ok)
+		assert.Equal(t, 1, code)
+		fake.Verify(t, "", expectedStderr)
+	})
+
+	t.Run("flame schema が parse 不能なら compile failed で FAIL", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		dir := t.TempDir()
+		// schema 側を意図的に YAML syntax 不能な内容にし、 production が出す
+		// `schema compile failed: ...` reason の出力契約を service-level test に焼き付ける。
+		writeFlameYAMLSchema(t, dir, "{ broken: [yaml\n")
+		target := filepath.Join(dir, "foo.yaml")
+		require.NoError(t, os.WriteFile(target, []byte(`---
+# yaml-language-server: $schema=./vendor/flame/schemas/foo.yaml.schema.yaml
+hello: world
+`), 0o600))
+		r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
+		r.AddCommand(yaml.New())
+		fake := clix.NewFakeIO(t, []string{"yaml", target})
+		// reason の suffix (library のエラー文面) は version 依存のため、 prefix
+		// (production の出力契約) を 1 行 (`\n$`) として正規表現で焼き付ける。
+		expectedRe := regexp.MustCompile(`(?s)^FAIL: ` + regexp.QuoteMeta(target) + `: schema compile failed:.*\n$`)
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		code, ok := clix.ExitCodeOf(err)
+		require.True(t, ok)
+		assert.Equal(t, 1, code)
+		assert.Regexp(t, expectedRe, fake.StderrString(t))
+		assert.Empty(t, fake.StdoutString(t))
 	})
 }

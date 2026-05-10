@@ -1,4 +1,5 @@
 ---
+# yaml-language-server: $schema=./vendor/flame/schemas/flame.yaml.schema.yaml
 # flame harness manifest (FLM_FEA_0003)
 flame:
   harness:

@@ -1,0 +1,85 @@
+---
+# yaml-language-server: $schema=https://json-schema.org/draft/2020-12/schema
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://raw.githubusercontent.com/wakuwaku3/flame/main/vendor/flame/schemas/flame.yaml.schema.yaml
+title: flame.yaml
+description: |
+  flame harness manifest. Refer to FLM_FEA_0003 §flame.yaml (manifest) for the
+  normative specification.
+type: object
+required:
+  - flame
+additionalProperties: false
+properties:
+  flame:
+    type: object
+    description: flame harness が参照する repo 固有設定の単一 namespace.
+    required:
+      - harness
+    additionalProperties: false
+    properties:
+      harness:
+        $ref: "#/$defs/harness"
+      ai:
+        $ref: "#/$defs/ai"
+$defs:
+  harness:
+    type: object
+    description: |
+      vendor チャネルの取得元と version (= 不変情報 = 手動編集で更新するメタデータ).
+    required:
+      - source
+      - version
+    additionalProperties: false
+    properties:
+      source:
+        type: string
+        description: vendor の取得元リポジトリ (例 github.com/<owner>/<repo>).
+        minLength: 1
+      version:
+        description: |
+          install 済み harness のバージョン. 通常は vX.Y.Z 形式の release tag を指定する.
+          harness の source 提供元 repo (= flame self) では特別マーカー値 'self' を指定する.
+        oneOf:
+          - type: string
+            pattern: ^v\d+\.\d+\.\d+$
+            description: release tag (vX.Y.Z).
+          - type: string
+            const: self
+            description: harness の source 提供元 repo を示す特別マーカー.
+      ignore:
+        type: array
+        description: flame install の通常工程のうち skip するものの list.
+        $comment: |
+          items.enum は FLM_FEA_0003 §flame.yaml (manifest) の flame.harness.ignore
+          valid value list と同期する. 拡張時は ADR を SoT として先に改訂し当該 enum
+          を追従させる.
+        items:
+          enum:
+            - .gitignore
+            - .claude/plugins
+        uniqueItems: true
+  ai:
+    type: object
+    description: |
+      AI hook の repo 固有拡張領域. 既知 hook category のみ厳密検査, 未知 category
+      は素通し.
+    additionalProperties: true
+    properties:
+      pre_push:
+        $ref: "#/$defs/aiPrePush"
+  aiPrePush:
+    type: object
+    description: flame ai hook pre-push の repo 固有拡張.
+    additionalProperties: false
+    properties:
+      stage1_extra_agents:
+        type: array
+        description: |
+          段階 1 並列レビューに組み込む repo-local reviewer agent 名 list.
+          各要素は当該 repo の .claude/agents/<name>.md の name frontmatter と
+          一致する文字列. 重複は先勝ち de-dup される.
+        items:
+          type: string
+          minLength: 1
+        uniqueItems: true
