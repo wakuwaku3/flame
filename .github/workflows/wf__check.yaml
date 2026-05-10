@@ -277,7 +277,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: devbox run -- flame install
       - name: Verify no drift after flame install
-        run: git diff --exit-code
+        run: |
+          git add -A --intent-to-add
+          git diff --exit-code
 
   summary:
     name: wf__check / summary
