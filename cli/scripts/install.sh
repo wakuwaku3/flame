@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # flame CLI installer (FLM_FEA_0002)。
 #
-# 当該リポジトリは private 前提のため、 release asset の取得には GitHub API への認証が
-# 必要となる。 install 起動時に GITHUB_TOKEN env が設定されているか、 もしくは
-# `gh auth token` で token が取り出せる環境であることが前提。
+# flame self は public リポジトリで配布するため anonymous で起動できる。 GITHUB_TOKEN env
+# もしくは `gh auth token` で token が解決された場合は Authorization header に付加し、
+# private fork / mirror 配下の release asset 取得経路にも同じ script で対応する
+# (FLI_FEA_0001 §install スクリプトの配置)。
 
 set -euo pipefail
 
@@ -78,10 +79,16 @@ detect_arch() {
 api_get() {
   local url="$1"
   local accept="${2:-application/vnd.github+json}"
-  curl -fsSL \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: ${accept}" \
-    "${url}"
+  if [ -n "${token}" ]; then
+    curl -fsSL \
+      -H "Authorization: Bearer ${token}" \
+      -H "Accept: ${accept}" \
+      "${url}"
+  else
+    curl -fsSL \
+      -H "Accept: ${accept}" \
+      "${url}"
+  fi
 }
 
 resolve_latest_version() {
@@ -102,8 +109,9 @@ resolve_latest_version() {
 }
 
 resolve_asset_id() {
-  # private repo 経由の download は asset URL ではなく asset id 経由で
-  # `Accept: application/octet-stream` を付けて取り出す必要があるため、 ここで id を解決する。
+  # asset URL ではなく asset id 経由で取り出す。 private fork / mirror 配下の release は
+  # asset id + `Accept: application/octet-stream` のみが認証込みの配信経路となるため、
+  # public / private 双方を単一経路で扱うため asset id を採る。
   local tag="$1"
   local asset_name="$2"
   local body asset_id
@@ -127,11 +135,18 @@ download_asset() {
   # Authorization を自動 strip する挙動のため意図通り動く。
   local asset_id="$1"
   local out_path="$2"
-  curl -fsSL \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/octet-stream" \
-    "${api_root}/releases/assets/${asset_id}" \
-    -o "${out_path}"
+  if [ -n "${token}" ]; then
+    curl -fsSL \
+      -H "Authorization: Bearer ${token}" \
+      -H "Accept: application/octet-stream" \
+      "${api_root}/releases/assets/${asset_id}" \
+      -o "${out_path}"
+  else
+    curl -fsSL \
+      -H "Accept: application/octet-stream" \
+      "${api_root}/releases/assets/${asset_id}" \
+      -o "${out_path}"
+  fi
 }
 
 archive_ext_for_os() {
@@ -235,7 +250,7 @@ main() {
   require_cmd jq
 
   if ! token="$(resolve_token)"; then
-    err "GITHUB_TOKEN is required for private repository download. Set GITHUB_TOKEN env var or run 'gh auth login' before invoking this installer."
+    note "no GITHUB_TOKEN / gh credential found; proceeding anonymously (private fork / mirror への install は GITHUB_TOKEN env か 'gh auth login' を要する)"
   fi
 
   local requested_version="${1:-}"

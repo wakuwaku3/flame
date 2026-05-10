@@ -34,7 +34,7 @@
 ### install スクリプトの配置
 
 - 配布対象アプリケーションごとに install スクリプトを当該 module 内 `<module>/scripts/install.sh` に置く。 flame CLI 自身については `cli/scripts/install.sh` が SoT
-- private リポジトリ配布における release asset の取得は GitHub API の asset id 経由 (`Accept: application/octet-stream`) で行う。 認証 token は `GITHUB_TOKEN` env もしくは `gh auth token` のいずれかで解決する
+- flame self は public リポジトリで配布するため install スクリプトは anonymous で起動できる。 release asset の取得は private fork / mirror 経路との互換性を維持するため GitHub API の asset id 経由 (`Accept: application/octet-stream`) を採り、 `GITHUB_TOKEN` env もしくは `gh auth token` で token が解決された場合のみ Authorization header を付加する ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §インストール の可視性連動規約に従う単一経路)
 - インストール先 default は `$HOME/.local/bin`、 環境変数 `FLAME_INSTALL_DIR` で override 可能
 
 ### dry_run の実装
@@ -46,7 +46,7 @@
 
 - flame self の release は main マージ自動で `wf__deploy.yaml` が起動し、 配下の `wf__deploy_tool.yaml` / `wf__deploy_lib.yaml` が並列で各配布対象を release する
 - flame CLI の release plumbing 関連 subcommand (`flame ci release ...`) は flame CLI 自身に閉じる。 配布対象 library module 側に spec emission の実装は持たない
-- private リポジトリ配下での flame バイナリ install は `cli/scripts/install.sh` が `curl ... | bash` 形式で起動でき、 token を解決して asset id 経由で download する
+- flame バイナリ install は `cli/scripts/install.sh` が `curl ... | bash` 形式で起動できる。 flame self は public のため anonymous で完結し、 private fork / mirror に対しては解決した token を Authorization header に付加して同じ asset id 経由経路で download する
 - release 経路を main マージ前に検証する手段として、 `wf__deploy_tool.yaml` / `wf__deploy_lib.yaml` を `workflow_dispatch` + `dry_run` / `prior_tag_override` で feature branch から起動できる。 別系統の検証用 workflow を保守する必要は無い
 - flame self の `lib` module は library 配布対象でかつ `lib/cmd/<app>_tool/` を持ちうるため、 同 module を入力にした tool 系 / library 系の 2 release が並列で走るが、 tag 名前空間 (`<app_name>/...` と `<module_path>/...`) が分離するため衝突しない
 - 「決定」 で抽象 policy として残した具体実装 (アーカイブ命名フォーマット文字列、 配布対象 OS / arch の個別組合せ、 リリースノート markdown のセクション見出し等) は release ワークフロー定義 / install スクリプト本体 / 関連 module 内ドキュメントに分散して保持される。 これらは仕様変更時に各実装側で更新する
