@@ -30,11 +30,11 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	overlayBy := indexOverlaysByInstall(prevLock)
+	prevByInstall := indexLockFilesByInstall(prevLock)
 	mergeArrayBy := indexMergeArrayByInstall(prevLock)
 	newLock := &Lock{Installed: nil, Files: nil, Embeds: nil}
 	for _, item := range plan.Items {
-		if execErr := executeItem(ctx, repoRoot, m, item, overlayBy, mergeArrayBy, newLock); execErr != nil {
+		if execErr := executeItem(ctx, repoRoot, m, item, prevByInstall, mergeArrayBy, newLock); execErr != nil {
 			return execErr
 		}
 	}
@@ -67,7 +67,7 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-func executeItem(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, overlayBy map[string]LockOverlay, mergeArrayBy map[string]MergeArrayStrategy, newLock *Lock) error {
+func executeItem(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, prevByInstall map[string]LockFile, mergeArrayBy map[string]MergeArrayStrategy, newLock *Lock) error {
 	if feat := featureForInstall(item.InstallPath, item.Kind); m.IsIgnored(feat) {
 		return nil
 	}
@@ -82,7 +82,7 @@ func executeItem(ctx context.Context, repoRoot string, m *Manifest, item PlanIte
 	case PlanKindTriggerWorkflow:
 		return executeTriggerWorkflow(ctx, repoRoot, m, item)
 	case PlanKindInstallCopy:
-		return executeInstallCopy(ctx, repoRoot, m, item, overlayBy, mergeArrayBy, newLock)
+		return executeInstallCopy(ctx, repoRoot, m, item, prevByInstall, mergeArrayBy, newLock)
 	case PlanKindUnknown:
 		return ex.Errorf("unknown plan kind for %s", item.VendorPath)
 	default:
@@ -111,7 +111,7 @@ func executeTriggerWorkflow(ctx context.Context, repoRoot string, m *Manifest, i
 	return writeWritable(ctx, installAbs, pinned)
 }
 
-func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, overlayBy map[string]LockOverlay, mergeArrayBy map[string]MergeArrayStrategy, newLock *Lock) error {
+func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item PlanItem, prevByInstall map[string]LockFile, mergeArrayBy map[string]MergeArrayStrategy, newLock *Lock) error {
 	vendorAbs := filepath.Join(repoRoot, item.VendorPath)
 	installAbs := filepath.Join(repoRoot, item.InstallPath)
 	vendorBytes, err := os.ReadFile(vendorAbs)
@@ -122,17 +122,22 @@ func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item 
 	if err != nil {
 		return err
 	}
+	prevEntry := prevByInstall[filepath.ToSlash(item.InstallPath)]
 	arrayStrategy := mergeArrayBy[filepath.ToSlash(item.InstallPath)]
-	merged, err := Merge(&MergeInput{
-		VendorContent:  vendorBytes,
-		OverlayContent: overlayBytes,
-		InstallPath:    item.InstallPath,
-		Strategy:       item.Merge,
-		ArrayStrategy:  arrayStrategy,
+	out, mergeErr := Merge3Way(&Merge3WayInput{
+		Strategy:     item.Merge,
+		InstallPath:  item.InstallPath,
+		BaseContent:  []byte(prevEntry.VendorContent),
+		TheirContent: vendorBytes,
+		OurContent:   overlayBytes,
 	})
-	if err != nil {
-		return err
+	if mergeErr != nil {
+		return mergeErr
 	}
+	if len(out.Conflicts) > 0 {
+		return formatConflictError(item.InstallPath, out.Conflicts)
+	}
+	merged := out.Content
 	if strings.HasPrefix(filepath.ToSlash(item.InstallPath), githubWorkflowsDir+"/") {
 		merged, err = pinUsesRef(merged, m.Source, m.Version)
 		if err != nil {
@@ -158,8 +163,8 @@ func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item 
 	case overlayPath != "":
 		entry.Overlay = &LockOverlay{Path: overlayPath, Content: string(overlayBytes)}
 	default:
-		if existing, ok := overlayBy[filepath.ToSlash(item.InstallPath)]; ok {
-			entry.Overlay = &LockOverlay{Path: existing.Path, Content: existing.Content}
+		if prevEntry.Overlay != nil {
+			entry.Overlay = &LockOverlay{Path: prevEntry.Overlay.Path, Content: prevEntry.Overlay.Content}
 		}
 	}
 	newLock.Files = append(newLock.Files, entry)
@@ -204,14 +209,22 @@ func writeWritable(_ context.Context, path string, content []byte) error {
 	return nil
 }
 
-func indexOverlaysByInstall(prev *Lock) map[string]LockOverlay {
-	out := map[string]LockOverlay{}
+func indexLockFilesByInstall(prev *Lock) map[string]LockFile {
+	out := map[string]LockFile{}
 	for _, f := range prev.Files {
-		if f.Overlay != nil {
-			out[f.Install] = *f.Overlay
-		}
+		out[f.Install] = f
 	}
 	return out
+}
+
+func formatConflictError(installPath string, conflicts []MergeConflict) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "merge conflict at %s (overlay vs vendor): %d conflict(s)\n", installPath, len(conflicts))
+	for _, c := range conflicts {
+		fmt.Fprintf(&b, "  - path=%s: %s\n", c.Path, c.Description)
+	}
+	b.WriteString("resolve by editing the overlay file (`*.flame-overlay.*`), then re-run `flame install`")
+	return ex.Errorf("%s", b.String())
 }
 
 func indexMergeArrayByInstall(prev *Lock) map[string]MergeArrayStrategy {
