@@ -14,11 +14,11 @@ import (
 
 // Merge3WayInput は 1 install entry を 3-way merge で合成する材料 (FLM_FEA_0003 §副ファイル overlay 機構)。 base = 前回 install 時の vendor snapshot (`flame.lock.files[].vendor_content`)、 their = 現状の vendor、 our = 現状の overlay (= 利用者が記述した「最終形」)。 fieldalignment を満たすため short-pointer 値を先、 []byte (24B) を末尾に並べる。
 type Merge3WayInput struct {
-	Strategy    MergeStrategy
-	InstallPath string
-	BaseContent []byte
+	Strategy     MergeStrategy
+	InstallPath  string
+	BaseContent  []byte
 	TheirContent []byte
-	OurContent  []byte
+	OurContent   []byte
 }
 
 // MergeConflict は 3-way merge で base / their / our の差分が両立しない位置を表す。 path は "." 区切りの YAML / JSON path。 sequence 内の conflict は path 末尾に "[i]" を付与する。
@@ -298,7 +298,7 @@ func scalarValue(n *yaml.Node) string {
 }
 
 func scalarKeyNode(s string) *yaml.Node {
-	return &yaml.Node{Kind: yaml.ScalarNode, Value: s}
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "", Value: s, Anchor: "", Alias: nil, Content: nil, HeadComment: "", LineComment: "", FootComment: "", Line: 0, Column: 0, Style: 0}
 }
 
 func joinPath(parent, key string) string {
@@ -525,10 +525,7 @@ func splitLines(b []byte) []string {
 	if len(b) == 0 {
 		return nil
 	}
-	s := string(b)
-	if strings.HasSuffix(s, "\n") {
-		s = strings.TrimSuffix(s, "\n")
-	}
+	s, _ := strings.CutSuffix(string(b), "\n")
 	if s == "" {
 		return nil
 	}

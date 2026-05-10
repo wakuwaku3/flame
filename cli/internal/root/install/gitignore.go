@@ -35,7 +35,7 @@ func applyGitignore(_ context.Context, repoRoot string) error {
 }
 
 func hasVendorIgnoreBlock(content []byte) bool {
-	for _, line := range strings.Split(string(content), "\n") {
+	for line := range strings.SplitSeq(string(content), "\n") {
 		if strings.TrimSpace(line) == "vendor/*" {
 			return true
 		}

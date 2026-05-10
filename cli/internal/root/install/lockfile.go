@@ -89,7 +89,7 @@ func LoadLock(_ context.Context, repoRoot string) (*Lock, error) {
 	path := filepath.Join(repoRoot, "flame.lock")
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return &Lock{Files: nil, Embeds: nil}, nil
+		return &Lock{Installed: nil, Files: nil, Embeds: nil}, nil
 	}
 	if err != nil {
 		return nil, ex.Wrapf(err, "read flame.lock: %s", path)

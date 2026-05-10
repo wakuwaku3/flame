@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/wakuwaku3/flame/cli/internal/fsperm"
 )
 
 func TestComputeVendorTreeHash(t *testing.T) {
@@ -41,7 +43,7 @@ func TestComputeVendorTreeHash(t *testing.T) {
 		h1, err := ComputeVendorTreeHash(context.Background(), root)
 		require.NoError(t, err)
 
-		require.NoError(t, os.WriteFile(filepath.Join(root, "a.txt"), []byte("v2\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "a.txt"), []byte("v2\n"), fsperm.File))
 		h2, err := ComputeVendorTreeHash(context.Background(), root)
 		require.NoError(t, err)
 
@@ -54,7 +56,7 @@ func TestComputeVendorTreeHash(t *testing.T) {
 		h1, err := ComputeVendorTreeHash(context.Background(), root)
 		require.NoError(t, err)
 
-		require.NoError(t, os.WriteFile(filepath.Join(root, "b.txt"), []byte("v1\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "b.txt"), []byte("v1\n"), fsperm.File))
 		h2, err := ComputeVendorTreeHash(context.Background(), root)
 		require.NoError(t, err)
 
@@ -75,8 +77,8 @@ func buildHashFixture(tb testing.TB, files map[string]string) string {
 	root := tb.TempDir()
 	for rel, content := range files {
 		path := filepath.Join(root, rel)
-		require.NoError(tb, os.MkdirAll(filepath.Dir(path), 0o755))
-		require.NoError(tb, os.WriteFile(path, []byte(content), 0o644))
+		require.NoError(tb, os.MkdirAll(filepath.Dir(path), fsperm.Dir))
+		require.NoError(tb, os.WriteFile(path, []byte(content), fsperm.File))
 	}
 	return root
 }

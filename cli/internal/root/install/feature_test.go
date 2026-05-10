@@ -13,8 +13,8 @@ func TestFeatureForInstall(t *testing.T) {
 	cases := []struct {
 		name        string
 		installPath string
-		kind        PlanKind
 		want        Feature
+		kind        PlanKind
 	}{
 		{name: ".golangci.yaml は golangci-lint", installPath: ".golangci.yaml", kind: PlanKindInstallCopy, want: FeatureGolangciLint},
 		{name: ".markdownlint-cli2.yaml は markdown-lint", installPath: ".markdownlint-cli2.yaml", kind: PlanKindInstallCopy, want: FeatureMarkdownLint},

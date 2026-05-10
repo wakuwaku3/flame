@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/wakuwaku3/flame/cli/internal/fsperm"
 )
 
 func TestMakeVendorReadOnly(t *testing.T) {
@@ -23,10 +25,10 @@ func TestMakeVendorReadOnly(t *testing.T) {
 
 		require.NoError(t, makeVendorReadOnly(context.Background(), root))
 
-		assertPerm(t, root, 0o555)
-		assertPerm(t, filepath.Join(root, ".claude"), 0o555)
-		assertPerm(t, filepath.Join(root, "CLAUDE.md"), 0o444)
-		assertPerm(t, filepath.Join(root, ".claude", "rules", "x.md"), 0o444)
+		assertPerm(t, root, readOnlyDirPerm)
+		assertPerm(t, filepath.Join(root, ".claude"), readOnlyDirPerm)
+		assertPerm(t, filepath.Join(root, "CLAUDE.md"), readOnlyPerm)
+		assertPerm(t, filepath.Join(root, ".claude", "rules", "x.md"), readOnlyPerm)
 	})
 }
 
@@ -34,9 +36,9 @@ func TestNeedsRefetch(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name string
 		prev *Lock
 		m    *Manifest
+		name string
 		want bool
 	}{
 		{
@@ -84,11 +86,11 @@ func TestMakeVendorWritable(t *testing.T) {
 
 		require.NoError(t, makeVendorWritable(context.Background(), root))
 
-		assertPerm(t, root, 0o755)
-		assertPerm(t, filepath.Join(root, ".claude"), 0o755)
-		assertPerm(t, filepath.Join(root, "CLAUDE.md"), 0o644)
+		assertPerm(t, root, dirPerm)
+		assertPerm(t, filepath.Join(root, ".claude"), dirPerm)
+		assertPerm(t, filepath.Join(root, "CLAUDE.md"), filePerm)
 		// 書き込みも復活
-		require.NoError(t, os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("after"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("after"), fsperm.File))
 	})
 }
 
@@ -118,20 +120,20 @@ func TestCopyTree(t *testing.T) {
 		t.Parallel()
 		src := t.TempDir()
 		dst := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(src, "sub"), 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(src, "a.txt"), []byte("alpha"), 0o644))
-		require.NoError(t, os.WriteFile(filepath.Join(src, "sub", "b.txt"), []byte("bravo"), 0o644))
-		require.NoError(t, os.WriteFile(filepath.Join(src, "exec.sh"), []byte("#!/bin/sh\n"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(src, "sub"), fsperm.Dir))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "a.txt"), []byte("alpha"), fsperm.File))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "sub", "b.txt"), []byte("bravo"), fsperm.File))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "exec.sh"), []byte("#!/bin/sh\n"), fsperm.Exec))
 
 		require.NoError(t, copyTree(context.Background(), src, dst))
 
-		assertPerm(t, filepath.Join(dst, "a.txt"), 0o644)
+		assertPerm(t, filepath.Join(dst, "a.txt"), filePerm)
 		assert.Equal(t, "alpha", string(mustReadFile(t, filepath.Join(dst, "a.txt"))))
 		assert.Equal(t, "bravo", string(mustReadFile(t, filepath.Join(dst, "sub", "b.txt"))))
 		// exec ビットが保持される
 		info, err := os.Stat(filepath.Join(dst, "exec.sh"))
 		require.NoError(t, err)
-		assert.NotZero(t, info.Mode().Perm()&0o111)
+		assert.NotZero(t, info.Mode().Perm()&os.FileMode(0o111))
 	})
 }
 
@@ -145,9 +147,9 @@ func mustReadFile(tb testing.TB, path string) []byte {
 func buildVendorTree(tb testing.TB) string {
 	tb.Helper()
 	root := tb.TempDir()
-	require.NoError(tb, os.MkdirAll(filepath.Join(root, ".claude", "rules"), 0o755))
-	require.NoError(tb, os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("vendor claude\n"), 0o644))
-	require.NoError(tb, os.WriteFile(filepath.Join(root, ".claude", "rules", "x.md"), []byte("rule\n"), 0o644))
+	require.NoError(tb, os.MkdirAll(filepath.Join(root, ".claude", "rules"), fsperm.Dir))
+	require.NoError(tb, os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("vendor claude\n"), fsperm.File))
+	require.NoError(tb, os.WriteFile(filepath.Join(root, ".claude", "rules", "x.md"), []byte("rule\n"), fsperm.File))
 	return root
 }
 

@@ -1,7 +1,6 @@
 package install
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -237,15 +236,15 @@ func TestMerge3Way_NestedMapping(t *testing.T) {
 	t.Parallel()
 
 	out, err := Merge3Way(&Merge3WayInput{
-		Strategy:    MergeDeep,
-		InstallPath: "x.yaml",
-		BaseContent: []byte("linters:\n  enable:\n    - errcheck\n    - govet\n"),
+		Strategy:     MergeDeep,
+		InstallPath:  "x.yaml",
+		BaseContent:  []byte("linters:\n  enable:\n    - errcheck\n    - govet\n"),
 		TheirContent: []byte("linters:\n  enable:\n    - errcheck\n    - govet\n    - ineffassign\n"),
-		OurContent: []byte("linters:\n  enable:\n    - errcheck\n    - govet\n    - mylinter\n"),
+		OurContent:   []byte("linters:\n  enable:\n    - errcheck\n    - govet\n    - mylinter\n"),
 	})
 	require.NoError(t, err)
 	assert.Empty(t, out.Conflicts)
 	s := string(out.Content)
-	assert.True(t, strings.Contains(s, "ineffassign"), "missing ineffassign:\n%s", s)
-	assert.True(t, strings.Contains(s, "mylinter"), "missing mylinter:\n%s", s)
+	assert.Contains(t, s, "ineffassign", "missing ineffassign in:\n%s", s)
+	assert.Contains(t, s, "mylinter", "missing mylinter in:\n%s", s)
 }

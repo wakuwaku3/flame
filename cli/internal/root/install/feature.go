@@ -9,7 +9,7 @@ import (
 type Feature string
 
 const (
-	// 工程単位 (= path に紐づかない処理を skip する)
+	// 工程単位 (= path に紐づかない処理を skip する).
 	FeatureVendorSync      Feature = "vendor-sync"
 	FeatureVendorReadonly  Feature = "vendor-readonly"
 	FeatureReadOnly        Feature = "read-only"
@@ -17,7 +17,7 @@ const (
 	FeatureClaudePlugins   Feature = "claude/plugins"
 	FeatureTriggerWorkflow Feature = "trigger-workflow"
 
-	// resource type / tool 単位 (= 該当 install path 群を skip する)
+	// resource type / tool 単位 (= 該当 install path 群を skip する).
 	FeatureClaudeRules  Feature = "claude/rules"
 	FeatureClaudeSkills Feature = "claude/skills"
 	FeatureGolangciLint Feature = "golangci-lint"
@@ -27,7 +27,7 @@ const (
 	FeatureVscode       Feature = "vscode"
 	FeatureADR          Feature = "adr"
 
-	// embed (= 取り込み形式の snippet 注入を skip する)
+	// embed (= 取り込み形式の snippet 注入を skip する).
 	FeatureEmbedClaudeMd Feature = "embed/claude-md"
 	FeatureEmbedEnvrc    Feature = "embed/envrc"
 	FeatureEmbedYamllint Feature = "embed/yamllint"

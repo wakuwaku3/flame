@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/wakuwaku3/flame/cli/internal/fsperm"
 )
 
 func TestApplyPluginMarketplace(t *testing.T) {
@@ -31,15 +33,16 @@ func TestApplyPluginMarketplace(t *testing.T) {
 	t.Run("既存 settings.json に追記する (他キーを保持)", func(t *testing.T) {
 		t.Parallel()
 		root := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(root, ".claude"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(root, ".claude"), fsperm.Dir))
 		original := `{"theme":"dark","extraKnownMarketplaces":{"other":{"source":{"source":"github","repo":"x/y"}}}}`
-		require.NoError(t, os.WriteFile(filepath.Join(root, ".claude", "settings.json"), []byte(original), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, ".claude", "settings.json"), []byte(original), fsperm.File))
 
 		require.NoError(t, applyPluginMarketplace(context.Background(), root, "github.com/wakuwaku3/flame"))
 
 		settings := mustReadJSON(t, filepath.Join(root, ".claude", "settings.json"))
 		assert.Equal(t, "dark", settings["theme"])
-		marketplaces := settings["extraKnownMarketplaces"].(map[string]any)
+		marketplaces, ok := settings["extraKnownMarketplaces"].(map[string]any)
+		require.True(t, ok)
 		assert.NotNil(t, marketplaces["other"])
 		assert.NotNil(t, marketplaces["flame"])
 	})
@@ -54,9 +57,9 @@ func TestApplyPluginMarketplace(t *testing.T) {
 	t.Run("extraKnownMarketplaces が object でなければ error", func(t *testing.T) {
 		t.Parallel()
 		root := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(root, ".claude"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(root, ".claude"), fsperm.Dir))
 		broken := `{"extraKnownMarketplaces":"not-an-object"}`
-		require.NoError(t, os.WriteFile(filepath.Join(root, ".claude", "settings.json"), []byte(broken), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, ".claude", "settings.json"), []byte(broken), fsperm.File))
 
 		err := applyPluginMarketplace(context.Background(), root, "github.com/wakuwaku3/flame")
 		require.Error(t, err)
