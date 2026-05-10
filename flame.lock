@@ -182,24 +182,8 @@ flame:
               gosec:
                 severity: low
                 confidence: low
-                # G304 / G703 (path inclusion / taint analysis): CLI ツールは利用者から
-                # filesystem path 引数を受け取って読み書きするのが本質責務であり、 path 引数の
-                # 非リテラル化を全面禁止する両 rule は false positive 生成器となる
-                # (FLM_APP_0008 §影響: G304 と同じ理由で G703 も globally 無効化)。
-                # G204 (subprocess with variable): `flame install` は flame.yaml の
-                # `flame.harness.version` を `git clone --branch <version>` の引数として
-                # 渡す経路 (FLM_FEA_0003 §チャネル C) を持つ。 version 値は manifest 経由で
-                # 利用側が指定する parameter であり shell 呼び出し用の任意文字列ではないため
-                # G204 の検出意図と一致しない。
-                # G122 (filesystem operation in WalkDir without root-scoped APIs):
-                # `flame install` の vendor sync は temp dir に git clone した内容を repo
-                # 内へ rsync する経路 (FLM_FEA_0003 §チャネル C) で、 temp dir は git
-                # checkout 直後の閉じた tree のため symlink TOCTOU 攻撃面が無い。
                 excludes:
                   - G304
-                  - G703
-                  - G204
-                  - G122
 
               gomoddirectives:
                 replace-local: false

@@ -175,6 +175,9 @@ linters:
       confidence: low
       excludes:
         - G304
+        - G703
+        - G204
+        - G122
 
     gomoddirectives:
       replace-local: false
