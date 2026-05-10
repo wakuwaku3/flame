@@ -1,4 +1,4 @@
-// Package lib は `flame ci release spec lib <module-path>` subcommand 実装。 配布対象 library module の Go 公開 API surface を AST 走査で抽出し、 JSON spec として stdout に emit する (FLM_FEA_0002 §版番号の決定経路 の library 経路)。 release ワークフロー ([FLM_FEA_0002](../../../../../../docs/adr/feature/FLM_FEA_0002__github_release.md)) が前回 release との diff から bump kind を判定する入力。
+// Package lib は `flame ci release spec lib <module-path>` subcommand 実装。 配布対象 library module の Go 公開 API surface を AST 走査で抽出し、 JSON spec として stdout に emit する (FLM_FEA_0004 §版番号の決定経路 の library 経路)。 release ワークフロー ([FLM_FEA_0004](../../../../../../docs/adr/feature/FLM_FEA_0004__release_policy.md)) が前回 release との diff から bump kind を判定する入力。
 package lib
 
 import (
@@ -194,7 +194,7 @@ func formatFuncDecl(fset *token.FileSet, decl *ast.FuncDecl) identifier {
 	return identifier{Name: name, Kind: kind, Signature: formatNode(fset, decl.Type)}
 }
 
-// FLM_FEA_0002 §版番号 の判定軸 (公開 surface 各要素の純粋追加 = MINOR / 既存要素の rename・型変更 = MAJOR) と identifier 1 件を 1:1 対応させるため、 struct / interface は型本体と exported field / method に分解する (1 単位の追加が 1 identifier の add に、 既存単位の変更が 1 identifier の shape-change に写る形にして diff 経路を要素単位の判定に揃える)。 type alias (`type Foo = X`) は alias 先そのものを指す宣言なので分解対象外として単一 identifier に保つ。
+// FLM_FEA_0004 §版番号 の判定軸 (公開 surface 各要素の純粋追加 = MINOR / 既存要素の rename・型変更 = MAJOR) と identifier 1 件を 1:1 対応させるため、 struct / interface は型本体と exported field / method に分解する (1 単位の追加が 1 identifier の add に、 既存単位の変更が 1 identifier の shape-change に写る形にして diff 経路を要素単位の判定に揃える)。 type alias (`type Foo = X`) は alias 先そのものを指す宣言なので分解対象外として単一 identifier に保つ。
 func formatTypeSpec(fset *token.FileSet, spec *ast.TypeSpec) []identifier {
 	typeName := spec.Name.Name
 	if spec.Assign.IsValid() {

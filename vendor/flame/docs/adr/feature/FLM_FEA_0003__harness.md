@@ -243,6 +243,10 @@ flame:
     version: vX.Y.Z
     ignore:                              # optional, 通常 install 工程の skip マーカー
       - .gitignore
+  ai:                                    # optional, AI 統合の拡張設定
+    pre_push:
+      stage1_extra_agents:               # optional, pre-push hook の段階 1 並列レビューに repo-local 追加 reviewer agent を組み込む
+        - <agent_name>
 ```
 
 各フィールドの意味:
@@ -253,6 +257,7 @@ flame:
   - `.gitignore` — `vendor/flame/` を `.gitignore` に登録する工程を skip する。 利用側は通常 vendor は commit せず `.gitignore` 登録するが、 例外として **harness の source 提供元 repo (= flame self) は vendor を commit する必要があるため `.gitignore` 登録を skip する** ことを宣言するマーカー
   - `.claude/plugins` — `/plugin marketplace add <source>` + `/plugin install <plugin>@<source>` (= Claude Code plugin marketplace 登録 + plugin install) の自動工程を skip する。 利用側は通常 上記経由で plugin (チャネル A) を有効化するが、 **harness の source 提供元 repo (= flame self) は `.claude-plugin/marketplace.json` および `plugins/<plugin-name>/` を repo 自身が同居して持つため (= source 提供元 repo は marketplace 兼 plugin 提供元)、 plugin の有効化経路は当該 repo 内部で別途規定する** ことを宣言するマーカー (具体経路は source 提供元 repo の internal ADR で別途定める。 例 flame self なら FLI_FEA_0003 で `scripts/claude` wrapper + `--plugin-dir plugins/flame` を採用)
   - `flame.harness.source` の git remote URL が当該 repo 自身の origin URL と一致するかでも判定可能だが、 ignore directive を明示しておくことで CLI 側の検査コードを単純化し、 また人間 reader にも本 repo の特殊性を文書化する
+- `flame.ai.pre_push.stage1_extra_agents` (optional): `flame ai hook pre-push` の段階 1 並列レビューに repo-local な追加 reviewer agent を組み込む list (`.claude/agents/<name>.md` を SoT)。 file 不在 / parse error / フィールド欠如はすべて soft fail (= 追加 agent なし) として扱う。 利用側 repo が独自の AI レビュー基準を pre-push hook に注入したいケースで利用する (`flame self` の場合は `flame-classification-reviewer` を組み込む形で利用)
 
 `flame.yaml` は **手動編集対象** (= version bump 等を人間 / 上位 tool が行う)。 install 時の生成情報 (`files[]` / `embeds[]` 等) は持たない。
 

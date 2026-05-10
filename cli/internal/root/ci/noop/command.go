@@ -1,4 +1,4 @@
-// Package noop は `flame ci noop [reason]` subcommand。 検査対象 / 配布対象 0 件で実体ジョブを起動できないケースで、 success の旨を CI ログに残して exit 0 で終了する固定 success 用 endpoint (FLM_ENG_0003 §並列化: 必ず 1 件以上の success job を返す / FLM_FEA_0002 §summary)。
+// Package noop は `flame ci noop [reason]` subcommand。 検査対象 / 配布対象 0 件で実体ジョブを起動できないケースで、 success の旨を CI ログに残して exit 0 で終了する固定 success 用 endpoint (FLM_ENG_0003 §並列化: 必ず 1 件以上の success job を返す / FLM_FEA_0004 §summary)。
 package noop
 
 import (

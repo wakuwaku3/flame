@@ -1,4 +1,4 @@
-// Package ghapi は gh CLI 経由の GitHub REST 呼び出しを 1 か所に集約する thin abstraction (FLM_FEA_0002 §リリースノート / §版番号の決定経路 が消費する compare / pulls / releases endpoint をまとめて扱うため)。 production 実装は `gh` バイナリを exec し、 test では Stub に差し替えて network 依存を排除する。
+// Package ghapi は gh CLI 経由の GitHub REST 呼び出しを 1 か所に集約する thin abstraction (FLM_FEA_0004 §リリースノート / §版番号の決定経路 が消費する compare / pulls / releases endpoint をまとめて扱うため)。 production 実装は `gh` バイナリを exec し、 test では Stub に差し替えて network 依存を排除する。
 package ghapi
 
 import (

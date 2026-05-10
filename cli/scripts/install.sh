@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# flame CLI installer (FLM_FEA_0002)。
+# flame CLI installer (FLI_FEA_0001)。
 #
 # flame self は public リポジトリで配布するため anonymous で起動できる。 GITHUB_TOKEN env
 # もしくは `gh auth token` で token が解決された場合は Authorization header に付加し、

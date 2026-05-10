@@ -1,4 +1,4 @@
-// Package tool は `flame ci release tool <module> <app_dir> <app_name> <commit_sha>` subcommand。 配布対象 _tool バイナリの release を end-to-end で実行する orchestrator (FLM_FEA_0002 §tool 配布)。 移行元 shell `.github/scripts/deploy/release-app.sh` と同一の振る舞いを Go ネイティブで再実装する。
+// Package tool は `flame ci release tool <module> <app_dir> <app_name> <commit_sha>` subcommand。 配布対象 _tool バイナリの release を end-to-end で実行する orchestrator (FLM_FEA_0004 §tool 配布)。 移行元 shell `.github/scripts/deploy/release-app.sh` と同一の振る舞いを Go ネイティブで再実装する。
 package tool
 
 import (
@@ -184,7 +184,7 @@ func doRun(ctx context.Context, stdout, stderr io.Writer, module, appDir, appNam
 		priorTag = appName + "/v" + plan.Prior
 	}
 
-	// FLM_FEA_0002 §リリース起動契機: 前回 release tag → 今回 commit で当該 module ディレクトリ配下に file change が 1 件も無い場合は release を作らない。 初版 release (priorTag 無し) は変更検査なしで作成する。
+	// FLM_FEA_0004 §リリース起動契機: 前回 release tag → 今回 commit で当該 module ディレクトリ配下に file change が 1 件も無い場合は release を作らない。 初版 release (priorTag 無し) は変更検査なしで作成する。
 	if priorTag != "" && !notes.HasModuleChangesSincePriorTag(ctx, stderr, gh, repo, priorTag, commitSHA, module) {
 		return ex.Wrap(emitSkipSummary(stdout, "App", appName, module, priorTag, commitSHA))
 	}
@@ -247,7 +247,7 @@ func doRun(ctx context.Context, stdout, stderr io.Writer, module, appDir, appNam
 	return ex.Wrap(sys.ghReleaseCreate(ctx, tag, title, notesPath, commitSHA, assets))
 }
 
-// targetPlatforms は配布対象 OS / arch (FLM_FEA_0002 §配布プラットフォーム)。
+// targetPlatforms は配布対象 OS / arch (FLM_FEA_0004 §配布プラットフォーム)。
 var targetPlatforms = []struct{ os, arch string }{
 	{"linux", "amd64"},
 	{"linux", "arm64"},
@@ -436,9 +436,9 @@ func emitDryRunPreview(stdout io.Writer, kind, name, nextVersion, priorTag, comm
 	return nil
 }
 
-// emitSkipSummary は release skip 時の stdout / GITHUB_STEP_SUMMARY 出力を担当する (FLM_FEA_0002 §リリース起動契機)。 stdout は workflow ログ用の 1 行、 GITHUB_STEP_SUMMARY は Actions UI の Job summary 上に Release skipped セクションを残す。 modulePath は file change 判定に使った module dir prefix で、 表示上の name と別 (tool 系統だと name=appName / modulePath=module で別物)。
+// emitSkipSummary は release skip 時の stdout / GITHUB_STEP_SUMMARY 出力を担当する (FLM_FEA_0004 §リリース起動契機)。 stdout は workflow ログ用の 1 行、 GITHUB_STEP_SUMMARY は Actions UI の Job summary 上に Release skipped セクションを残す。 modulePath は file change 判定に使った module dir prefix で、 表示上の name と別 (tool 系統だと name=appName / modulePath=module で別物)。
 func emitSkipSummary(stdout io.Writer, kind, name, modulePath, priorTag, commitSHA string) error {
-	fmt.Fprintf(stdout, "skip release: no file changes under %s/ since %s (FLM_FEA_0002 §リリース起動契機)\n", modulePath, priorTag)
+	fmt.Fprintf(stdout, "skip release: no file changes under %s/ since %s (FLM_FEA_0004 §リリース起動契機)\n", modulePath, priorTag)
 	stepSummary := os.Getenv("GITHUB_STEP_SUMMARY")
 	if stepSummary == "" {
 		return nil
