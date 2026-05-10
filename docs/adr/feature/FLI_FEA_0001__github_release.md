@@ -35,7 +35,7 @@
 
 - 配布対象アプリケーションごとに install スクリプトを当該 module 内 `<module>/scripts/install.sh` に置く。 flame CLI 自身については `cli/scripts/install.sh` が SoT
 - flame self は public リポジトリで配布するため install スクリプトは anonymous で起動できる。 release asset の取得は private fork / mirror 経路との互換性を維持するため GitHub API の asset id 経由 (`Accept: application/octet-stream`) を採り、 `GITHUB_TOKEN` env もしくは `gh auth token` で token が解決された場合のみ Authorization header を付加する ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §インストール の可視性連動規約に従う単一経路)
-- インストール先 default は `$HOME/.local/bin`、 環境変数 `FLAME_INSTALL_DIR` で override 可能
+- インストール先 default はユーザ書き込み可能なディレクトリとし、 環境変数で override 可能とする ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §影響: 具体パス・環境変数名は install スクリプト本体に持たせ ADR では抽象 policy のみを保持する)
 
 ### dry_run の実装
 
