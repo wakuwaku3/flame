@@ -33,6 +33,7 @@ flame self repo の Claude Code セッションは **PATH shadow した `claude`
 - worktree 内で session を起動した場合は worktree 直下の `plugins/flame` を読み、 root で起動した場合は root の `plugins/flame` を読む (= cwd の git context に従う)
 - worktree に `plugins/flame` が存在しない場合は plugin 抜きで素通しされる
 - wrapper script は shellcheck / shebang 規約等の通常の shell script 静的検査の対象になる ([FLM_APP_0002](../../../vendor/flame/docs/adr/application/FLM_APP_0002__shell_script.md))
+- repo の `.claude/settings.json` には plugin 有効化用の `enabledPlugins` を持たない。 wrapper の `--plugin-dir` がセッション単位で plugin を有効化するため `enabledPlugins` 経由は不要であり、 仮に `enabledPlugins: { "flame@flame": true }` を持つと Claude Code が marketplace `flame` を解決しようとして `Plugin not found in marketplace "flame"` エラーが /plugins UI に出続ける (本 repo は marketplace を user scope に export しないため)
 - 本 ADR は flame self の internal ADR ([FLI_GEN_0001](../general/FLI_GEN_0001__adr_prefix.md))。 利用側 repo には配布されない
 
 ## 評価
