@@ -80,7 +80,6 @@ func (m *Manifest) IsSelf() bool {
 	return m.Version == SelfVersion
 }
 
-// IsIgnored は manifest の ignore に当該 Feature が含まれているかを返す。
 func (m *Manifest) IsIgnored(f Feature) bool {
 	if f == "" {
 		return false

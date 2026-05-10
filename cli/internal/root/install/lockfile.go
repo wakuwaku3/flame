@@ -67,7 +67,6 @@ type LockEmbed struct {
 	Snippet string `yaml:"snippet"`
 }
 
-// Lock は flame.lock 全体を表す。
 type Lock struct {
 	Installed *LockInstalled
 	Files     []LockFile

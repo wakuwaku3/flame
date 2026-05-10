@@ -57,7 +57,6 @@ type PlanItem struct {
 	Kind        PlanKind
 }
 
-// PlanKind は plan item の分類。
 type PlanKind int
 
 const (
@@ -71,7 +70,6 @@ const (
 	PlanKindEmbed
 )
 
-// Plan は flame install が処理する全 entry の list。
 type Plan struct {
 	Items []PlanItem
 }
@@ -136,7 +134,6 @@ func BuildPlan(_ context.Context, repoRoot string, m *Manifest) (*Plan, error) {
 	return &Plan{Items: items}, nil
 }
 
-// snippetInstallPath は embed 対象の vendor path から repo root 相対の install 先 path を導く。
 func snippetInstallPath(vendorRel string) string {
 	rel, err := filepath.Rel(VendorRoot, vendorRel)
 	if err != nil {
@@ -161,7 +158,6 @@ func resolveInstallPath(vendorRel string) (installPath string, kind PlanKind) {
 	return relUnderVendor, PlanKindInstallCopy
 }
 
-// skipVendorPath は flame self での install 対象外 path、 vendor 化対象外 marker file を弾く。
 func skipVendorPath(vendorRel string, isSelf bool) bool {
 	relUnderVendor := strings.TrimPrefix(vendorRel, VendorRoot+"/")
 	if relUnderVendor == vendorRel {

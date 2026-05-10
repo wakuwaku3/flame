@@ -89,7 +89,6 @@ func TestMakeVendorWritable(t *testing.T) {
 		assertPerm(t, root, dirPerm)
 		assertPerm(t, filepath.Join(root, ".claude"), dirPerm)
 		assertPerm(t, filepath.Join(root, "CLAUDE.md"), filePerm)
-		// 書き込みも復活
 		require.NoError(t, os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("after"), fsperm.File))
 	})
 }
@@ -130,7 +129,6 @@ func TestCopyTree(t *testing.T) {
 		assertPerm(t, filepath.Join(dst, "a.txt"), filePerm)
 		assert.Equal(t, "alpha", string(mustReadFile(t, filepath.Join(dst, "a.txt"))))
 		assert.Equal(t, "bravo", string(mustReadFile(t, filepath.Join(dst, "sub", "b.txt"))))
-		// exec ビットが保持される
 		info, err := os.Stat(filepath.Join(dst, "exec.sh"))
 		require.NoError(t, err)
 		assert.NotZero(t, info.Mode().Perm()&os.FileMode(0o111))
