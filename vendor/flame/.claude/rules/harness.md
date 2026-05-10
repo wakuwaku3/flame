@@ -3,11 +3,13 @@ description: flame harness を 3 チャネル分散 (Claude Code plugin / reusab
 paths:
   - vendor/flame/**
   - flame.yaml
+  - flame.lock
   - "**/*.flame-overlay"
   - "**/*.flame-overlay.*"
   - .claude-plugin/**
   - plugins/**
   - .github/workflows/wf__*.yaml
+  - .github/workflows/flame-trg__*.yaml
 ---
 
 # FLM_FEA_0003
