@@ -1,4 +1,4 @@
-// Package root は flame CLI の root command を組み立てる ([FLM_FEA_0004](../../../docs/adr/feature/FLM_FEA_0004__flame_cli.md))。 子 group / leaf は [FLM_APP_0008](../../../docs/adr/application/FLM_APP_0008__cli.md) §subcommand package の階層 に従い `<module>/internal/root/<cmd1>[/<cmd2>...]/` に物理ディレクトリで配置している。
+// Package root は flame CLI の root command を組み立てる ([FLI_FEA_0002](../../../docs/adr/feature/FLI_FEA_0002__flame_cli.md))。 子 group / leaf は [FLM_APP_0008](../../../vendor/flame/docs/adr/application/FLM_APP_0008__cli.md) §subcommand package の階層 に従い `<module>/internal/root/<cmd1>[/<cmd2>...]/` に物理ディレクトリで配置している。
 package root
 
 import (

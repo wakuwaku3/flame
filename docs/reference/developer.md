@@ -30,7 +30,7 @@ flame は AI 主体の開発を前提とする。 Claude Code に指示を出す
 2. **CI** — main マージ前の最終ゲート (hook と同一の検査も重複実行)
 3. **監視** — デプロイ後検出。hook / CI に再現テストとして昇格させる
 
-手動で検査を回す場合: `flame check <type> <file>...` (type は yaml / shell / go / json / document / adr / devbox / flow-document / github-actions のいずれか)
+手動で検査を回す場合: `flame check <type> <file>...` (type は yaml / shell / json / document / adr / devbox / flow-document / github-actions のいずれか)。 `go` だけは build / lint / test を束ねる parent group のため、 `flame check go {build|lint|test} <pkg>...` の形で起動する。
 
 ## 関連 ADR / リソース
 

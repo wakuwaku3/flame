@@ -1,4 +1,4 @@
-// Package notes は release notes 生成 (FLM_FEA_0002 §リリースノート) の共通ロジック。 tool / library 系統で共有される PR 列挙 (compare API + commit message 経由 PR 番号抽出 + label filter) と Markdown 構築を持ち、 install スニペットだけ系統で異なるため caller が文字列で渡す。
+// Package notes は release notes 生成 (FLM_FEA_0004 §リリースノート) の共通ロジック。 tool / library 系統で共有される PR 列挙 (compare API + commit message 経由 PR 番号抽出 + label filter) と Markdown 構築を持ち、 install スニペットだけ系統で異なるため caller が文字列で渡す。
 package notes
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/wakuwaku3/flame/lib/ex"
 )
 
-// HasModuleChangesSincePriorTag は前回 release tag → 今回 commit で当該 module ディレクトリ配下に file change が 1 件でもあれば true を返す (FLM_FEA_0002 §リリース起動契機)。 caller が release を skip する判断に使う。 label PR 件数 (`module/<name>`) で判定する案は fork PR / label 付与前 merge / merge-commit などで誤検知 (実変更があるのに 0 件判定) しやすいため不採用、 GitHub compare API の `.files[].filename` を当該 module dir prefix で絞り込む path ベース判定を採用する。 compare API 失敗 / response 解釈失敗 / compare REST truncation 兆候 (commits が total に届いていない / files が 300 件上限張り付き) を検出した場合は安全側 (= release を進める) で true を返し、 warn にメッセージを残す (shell 版 `module_has_changes_since_prior_tag` と挙動を揃える)。
+// HasModuleChangesSincePriorTag は前回 release tag → 今回 commit で当該 module ディレクトリ配下に file change が 1 件でもあれば true を返す (FLM_FEA_0004 §リリース起動契機)。 caller が release を skip する判断に使う。 label PR 件数 (`module/<name>`) で判定する案は fork PR / label 付与前 merge / merge-commit などで誤検知 (実変更があるのに 0 件判定) しやすいため不採用、 GitHub compare API の `.files[].filename` を当該 module dir prefix で絞り込む path ベース判定を採用する。 compare API 失敗 / response 解釈失敗 / compare REST truncation 兆候 (commits が total に届いていない / files が 300 件上限張り付き) を検出した場合は安全側 (= release を進める) で true を返し、 warn にメッセージを残す (shell 版 `module_has_changes_since_prior_tag` と挙動を揃える)。
 func HasModuleChangesSincePriorTag(ctx context.Context, warn io.Writer, gh ghapi.Client, repo, priorTag, headSHA, modulePath string) bool {
 	if priorTag == "" || headSHA == "" || modulePath == "" {
 		return true
@@ -115,10 +115,10 @@ type pullRequest struct {
 	Number int
 }
 
-// prNumberPattern は squash-merge default で commit subject 末尾に GitHub が付与する `(#<number>)` から PR 番号を抽出する (FLM_FEA_0002 §リリースノート: 番号抽出経路は immediate consistent な `/pulls/{n}` 解決のために必要)。
+// prNumberPattern は squash-merge default で commit subject 末尾に GitHub が付与する `(#<number>)` から PR 番号を抽出する (FLM_FEA_0004 §リリースノート: 番号抽出経路は immediate consistent な `/pulls/{n}` 解決のために必要)。
 var prNumberPattern = regexp.MustCompile(`\(#(\d+)\)\s*$`)
 
-// collectPRs は compare API → 各 commit subject の `(#<n>)` 抽出 → `/pulls/{n}` で PR detail 取得 → label で client 側絞込みの 4 段で PR 列挙を行う (FLM_FEA_0002 §リリースノート)。 compare 失敗時は warn に記録して空 list を返し release 自体は通す経路は compare error を Wrap せず caller に戻すと release が止まるため、 ここで吸収して `(nil, nil)` を返す (nilerr lint は本関数の意図的挙動として suppress)。
+// collectPRs は compare API → 各 commit subject の `(#<n>)` 抽出 → `/pulls/{n}` で PR detail 取得 → label で client 側絞込みの 4 段で PR 列挙を行う (FLM_FEA_0004 §リリースノート)。 compare 失敗時は warn に記録して空 list を返し release 自体は通す経路は compare error を Wrap せず caller に戻すと release が止まるため、 ここで吸収して `(nil, nil)` を返す (nilerr lint は本関数の意図的挙動として suppress)。
 func collectPRs(ctx context.Context, warn io.Writer, gh ghapi.Client, repo, priorTag, headSHA, label string) ([]pullRequest, error) {
 	if priorTag == "" || headSHA == "" || label == "" {
 		return nil, ex.New("priorTag / headSHA / label must be non-empty")

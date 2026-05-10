@@ -1,4 +1,4 @@
-// Package dispatch は bucketize 結果を各 checker に並列で振り分けて実行する dispatcher (FLM_FEA_0001 §並列性)。 cli/internal/root/check/* の各 checker package の Run を in-process で呼ぶ (FLM_FEA_0004: cli は cli/scripts/install.sh と .github/workflows/tests/*.sh 以外の shell を呼ばない)。
+// Package dispatch は bucketize 結果を各 checker に並列で振り分けて実行する dispatcher (FLM_FEA_0001 §checker の独立性)。 cli/internal/root/check/* の各 checker package の Run を in-process で呼ぶ (FLM_FEA_0005 §shell が許される例外: cli は cli/scripts/install.sh と .github/workflows/tests/*.sh 以外の shell を呼ばない)。
 package dispatch
 
 import (
@@ -104,7 +104,7 @@ func runOne(ctx context.Context, e bucketize.Entry) (output string, exitCode int
 	return out + fmt.Sprintf("%v\n", err), 1
 }
 
-// checkerIO は dispatch 内部だけで使う clix.RunInput 実装。 lib v1.1.0 で RunInput interface の method が exported になり caller 側で直接 implement できるようになったため、 in-process invocation が実現できる (subprocess + os.Executable に依存せず Go process 内に閉じる)。
+// checkerIO は dispatch 内部だけで使う clix.RunInput 実装。 lib 側で RunInput interface の method が exported されているため caller 側で直接 implement でき、 in-process invocation が実現できる (subprocess + os.Executable に依存せず Go process 内に閉じる)。
 type checkerIO struct {
 	stdin  io.Reader
 	stdout io.Writer

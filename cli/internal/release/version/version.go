@@ -1,4 +1,4 @@
-// Package version は release 経路の semver 算出共通ロジック (FLM_FEA_0002 §版番号)。 前回 tag の取得・spec の flat map diff から bump kind を決める処理は tool / lib 系で共通化できるため本 package に集約する。 系統別の差異 (flatten 関数 / tag prefix / MAJOR 自動 release 可否) は caller が引数で渡す。
+// Package version は release 経路の semver 算出共通ロジック (FLM_FEA_0004 §版番号)。 前回 tag の取得・spec の flat map diff から bump kind を決める処理は tool / lib 系で共通化できるため本 package に集約する。 系統別の差異 (flatten 関数 / tag prefix / MAJOR 自動 release 可否) は caller が引数で渡す。
 package version
 
 import (
@@ -88,7 +88,7 @@ func Compute(ctx context.Context, warn io.Writer, in *Input) (*Plan, error) {
 	}
 
 	if in.ForbidMajor && bump == BumpMajor {
-		return nil, ex.Errorf("MAJOR bump detected; library MAJOR auto-release is not supported (FLM_FEA_0002 §版番号)")
+		return nil, ex.Errorf("MAJOR bump detected; library MAJOR auto-release is not supported (FLM_FEA_0004 §版番号)")
 	}
 	next, err := bumpVersion(prior, bump)
 	if err != nil {
