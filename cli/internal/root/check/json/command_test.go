@@ -16,6 +16,17 @@ import (
 func TestRun(t *testing.T) {
 	t.Parallel()
 
+	// writeFlameJSONSchema は TestRun 内の subtest からのみ参照される helper のため、
+	// FLM_APP_0009 §test 内 identifier scope に従い関数 scope の closure として宣言する。
+	writeFlameJSONSchema := func(tb testing.TB, dir, content string) string {
+		tb.Helper()
+		schemasDir := filepath.Join(dir, "vendor", "flame", "schemas")
+		require.NoError(tb, os.MkdirAll(schemasDir, 0o750))
+		path := filepath.Join(schemasDir, "foo.json.schema.json")
+		require.NoError(tb, os.WriteFile(path, []byte(content), 0o600))
+		return path
+	}
+
 	t.Run("全て妥当な JSON ファイルなら no-op success", func(t *testing.T) {
 		t.Parallel()
 
@@ -271,13 +282,32 @@ func TestRun(t *testing.T) {
 		assert.Equal(t, 1, code)
 		fake.Verify(t, "", expectedStderr)
 	})
-}
 
-func writeFlameJSONSchema(tb testing.TB, dir, content string) string {
-	tb.Helper()
-	schemasDir := filepath.Join(dir, "vendor", "flame", "schemas")
-	require.NoError(tb, os.MkdirAll(schemasDir, 0o750))
-	path := filepath.Join(schemasDir, "foo.json.schema.json")
-	require.NoError(tb, os.WriteFile(path, []byte(content), 0o600))
-	return path
+	t.Run("flame schema が parse 不能なら compile failed で FAIL", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		dir := t.TempDir()
+		// schema 側を意図的に JSON syntax 不能な内容にし、 production が出す
+		// `schema compile failed: ...` reason の出力契約を service-level test に焼き付ける。
+		writeFlameJSONSchema(t, dir, "{ broken")
+		target := filepath.Join(dir, "foo.json")
+		require.NoError(t, os.WriteFile(target, []byte(`{"$schema":"./vendor/flame/schemas/foo.json.schema.json","hello":"world"}`), 0o600))
+		r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
+		r.AddCommand(json.New())
+		fake := clix.NewFakeIO(t, []string{"json", target})
+		// reason の suffix (library のエラー文面) は version 依存のため、 prefix
+		// (production の出力契約) を 1 行 (`\n$`) として正規表現で焼き付ける。
+		expectedRe := regexp.MustCompile(`(?s)^FAIL: ` + regexp.QuoteMeta(target) + `: schema compile failed:.*\n$`)
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		code, ok := clix.ExitCodeOf(err)
+		require.True(t, ok)
+		assert.Equal(t, 1, code)
+		assert.Regexp(t, expectedRe, fake.StderrString(t))
+		assert.Empty(t, fake.StdoutString(t))
+	})
 }
