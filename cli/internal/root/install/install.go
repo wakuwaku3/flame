@@ -23,7 +23,7 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if syncErr := SyncVendor(ctx, repoRoot, m); syncErr != nil {
+	if syncErr := SyncVendor(ctx, repoRoot, m, prevLock); syncErr != nil {
 		return syncErr
 	}
 	plan, err := BuildPlan(ctx, repoRoot, m)
@@ -32,13 +32,18 @@ func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 	}
 	overlayBy := indexOverlaysByInstall(prevLock)
 	mergeArrayBy := indexMergeArrayByInstall(prevLock)
-	newLock := &Lock{Files: nil, Embeds: nil}
+	newLock := &Lock{Installed: nil, Files: nil, Embeds: nil}
 	for _, item := range plan.Items {
 		if execErr := executeItem(ctx, repoRoot, m, item, overlayBy, mergeArrayBy, newLock); execErr != nil {
 			return execErr
 		}
 	}
 	sortLockFiles(newLock)
+	installed, instErr := buildInstalledRecord(ctx, repoRoot, m)
+	if instErr != nil {
+		return instErr
+	}
+	newLock.Installed = installed
 	if err := WriteLock(ctx, repoRoot, newLock); err != nil {
 		return err
 	}
@@ -223,6 +228,20 @@ func sortLockFiles(lock *Lock) {
 	sort.SliceStable(lock.Files, func(i, j int) bool {
 		return lock.Files[i].Install < lock.Files[j].Install
 	})
+}
+
+// buildInstalledRecord は flame.lock.installed セクションの内容 (= 前回 install 実行時の source / version / vendor tree hash) を組み立てる (FLM_FEA_0003 §flame.lock の installed)。 self mode では tree_hash を空に保つ (working tree が常時変動するため CI が壊れる) という ADR の規定に従う。
+func buildInstalledRecord(ctx context.Context, repoRoot string, m *Manifest) (*LockInstalled, error) {
+	out := &LockInstalled{Source: m.Source, Version: m.Version, TreeHash: ""}
+	if m.IsSelf() {
+		return out, nil
+	}
+	hash, err := ComputeVendorTreeHash(ctx, filepath.Join(repoRoot, VendorRoot))
+	if err != nil {
+		return nil, err
+	}
+	out.TreeHash = hash
+	return out, nil
 }
 
 // applyReadOnly は install copy / trg__ scaffold の install 先を chmod 444 で確定させる (FLM_FEA_0003 §install 先の read-only 強制)。 manifest で個別 Feature が ignore されている entry は元々 install されていないため対象外。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期 file IO のみ。

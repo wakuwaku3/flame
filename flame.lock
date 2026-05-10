@@ -1,6 +1,9 @@
 ---
 # flame harness lockfile (FLM_FEA_0003、 CLI 自動生成・更新)
 flame:
+  installed:
+    source: github.com/wakuwaku3/flame
+    version: self
   files:
     - install: .golangci.yaml
       vendor: vendor/flame/.golangci.yaml

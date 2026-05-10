@@ -30,6 +30,50 @@ func TestMakeVendorReadOnly(t *testing.T) {
 	})
 }
 
+func TestNeedsRefetch(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		prev *Lock
+		m    *Manifest
+		want bool
+	}{
+		{
+			name: "前回 install 記録なしは false (旧 schema / 初回)",
+			prev: &Lock{Installed: nil, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: false,
+		},
+		{
+			name: "前回と同一 source / version は false",
+			prev: &Lock{Installed: &LockInstalled{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", TreeHash: "sha256:x"}, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: false,
+		},
+		{
+			name: "version が異なれば true",
+			prev: &Lock{Installed: &LockInstalled{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", TreeHash: "sha256:x"}, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.1.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: true,
+		},
+		{
+			name: "source が異なれば true",
+			prev: &Lock{Installed: &LockInstalled{Source: "github.com/old/flame", Version: "v1.0.0", TreeHash: "sha256:x"}, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := needsRefetch(tc.prev, tc.m)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestMakeVendorWritable(t *testing.T) {
 	t.Parallel()
 
