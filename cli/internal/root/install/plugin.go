@@ -13,7 +13,7 @@ import (
 	"github.com/wakuwaku3/flame/lib/ex"
 )
 
-// applyPluginMarketplace は Claude Code の plugin marketplace 登録 + plugin install を `.claude/settings.json` に対して書き込む (FLM_FEA_0003 §チャネル A)。 manifest の `flame.harness.source` (= `github.com/<owner>/<repo>`) から marketplace を組み立て、 plugin 名は marketplace 末尾の repo 名と同一 (= `flame@flame`) とする。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期的な local file IO のみで cancel 経路を持たない。
+// applyPluginMarketplace は Claude Code の plugin marketplace 登録 + plugin install を `.claude/settings.json` に対して書き込む (FLM_FEA_0003 §チャネル A)。 manifest の `flame.source` (= `github.com/<owner>/<repo>`) から marketplace を組み立て、 plugin 名は marketplace 末尾の repo 名と同一 (= `<repo>@<repo>`) とする。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期的な local file IO のみで cancel 経路を持たない。
 func applyPluginMarketplace(ctx context.Context, repoRoot, source string) error {
 	owner, repo, err := parseSource(source)
 	if err != nil {
@@ -37,7 +37,7 @@ func parseSource(source string) (owner, repo string, err error) {
 	trimmed := strings.TrimPrefix(source, "github.com/")
 	parts := strings.SplitN(trimmed, "/", sourceParts)
 	if len(parts) != sourceParts || parts[0] == "" || parts[1] == "" {
-		return "", "", ex.Errorf("flame.harness.source must be `github.com/<owner>/<repo>`: %q", source)
+		return "", "", ex.Errorf("flame.source must be `github.com/<owner>/<repo>`: %q", source)
 	}
 	return parts[0], parts[1], nil
 }

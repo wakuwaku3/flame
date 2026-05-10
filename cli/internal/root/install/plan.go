@@ -170,6 +170,9 @@ func skipVendorPath(vendorRel string, isSelf bool) bool {
 		return true
 	case strings.HasPrefix(relUnderVendor, "devbox/"):
 		return true
+	case strings.HasPrefix(relUnderVendor, "schemas/"):
+		// schemas/ は flame install の install 経路を取らず、 利用側 / source 提供元 repo の双方が vendor SoT を直接参照する (FLM_FEA_0003 §schema の機械可読化、 `tests/shared/` と同じ運用)。
+		return true
 	}
 	if isSelf {
 		switch {

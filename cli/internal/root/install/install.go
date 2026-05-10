@@ -135,6 +135,9 @@ func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item 
 		return mergeErr
 	}
 	if len(out.Conflicts) > 0 {
+		if writeErr := writeConflictMarker(repoRoot, item.InstallPath, overlayBytes, vendorBytes, out.Conflicts); writeErr != nil {
+			return writeErr
+		}
 		return formatConflictError(item.InstallPath, out.Conflicts)
 	}
 	merged := out.Content
@@ -222,6 +225,36 @@ func indexLockFilesByInstall(prev *Lock) map[string]LockFile {
 		out[f.Install] = f
 	}
 	return out
+}
+
+// writeConflictMarker は 3-way merge で conflict が検出された場合に overlay 副ファイルへ git 形式の conflict marker を書き戻す (FLM_FEA_0003 §副ファイル overlay 機構 §conflict 発生時の挙動)。 ADR は inline marker (= 構造化 3-way なら該当 mapping value / sequence 要素レベルに埋め込み) を要求するが、 本実装は first-cut として overlay 全体を OURS / THEIRS で wrap する簡易形式を採用する。 結果として overlay は次回 manifest load 時に parse 失敗で fail する (= 利用者に解決を促す)。 inline marker 化は follow-up とする。
+func writeConflictMarker(repoRoot, installPath string, overlayContent, vendorContent []byte, conflicts []MergeConflict) error {
+	overlayRel := overlayPathFor(installPath)
+	overlayAbs := filepath.Join(repoRoot, overlayRel)
+	var b strings.Builder
+	fmt.Fprintf(&b, "# flame install: 3-way merge conflict (install=%s)\n", installPath)
+	for _, c := range conflicts {
+		fmt.Fprintf(&b, "#   - path=%s: %s\n", c.Path, c.Description)
+	}
+	b.WriteString("# Resolve by editing this file (remove markers and apply intended values), then re-run `flame install`.\n")
+	b.WriteString("<<<<<<< OURS (current overlay)\n")
+	b.Write(overlayContent)
+	if len(overlayContent) > 0 && overlayContent[len(overlayContent)-1] != '\n' {
+		b.WriteByte('\n')
+	}
+	b.WriteString("=======\n")
+	b.Write(vendorContent)
+	if len(vendorContent) > 0 && vendorContent[len(vendorContent)-1] != '\n' {
+		b.WriteByte('\n')
+	}
+	b.WriteString(">>>>>>> THEIRS (current vendor)\n")
+	if mkErr := os.MkdirAll(filepath.Dir(overlayAbs), dirPerm); mkErr != nil {
+		return ex.Wrapf(mkErr, "mkdir overlay parent: %s", overlayAbs)
+	}
+	if writeErr := os.WriteFile(overlayAbs, []byte(b.String()), filePerm); writeErr != nil {
+		return ex.Wrapf(writeErr, "write conflict marker overlay: %s", overlayAbs)
+	}
+	return nil
 }
 
 func formatConflictError(installPath string, conflicts []MergeConflict) error {

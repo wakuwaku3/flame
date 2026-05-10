@@ -18,7 +18,7 @@ type MergeStrategy string
 const (
 	// MergeDeep は構造化 deep merge (YAML / JSON)。
 	MergeDeep MergeStrategy = "deep"
-	// MergeAppend はテキスト末尾追加 (vendor 末尾に overlay を連結)。
+	// MergeAppend は line-based 3-way merge (base = 前回 vendor、 their = 現在の vendor、 our = 現在の overlay)。
 	MergeAppend MergeStrategy = "append"
 	// MergeReplace は overlay 不可で vendor のみで上書き (生成物に使う)。
 	MergeReplace MergeStrategy = "replace"

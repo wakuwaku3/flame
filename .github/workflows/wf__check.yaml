@@ -245,6 +245,7 @@ jobs:
       - name: Install devbox
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # third-party action の SHA pin (40 文字 hex) は line-length 80 を必ず超過する。 改行で SHA を分割すると yaml string scalar として別文字列となり pin が壊れるため、 1 行で書き切る経路以外に表現が無い。 グローバル無効化は他 yaml の line-length 検出力を失うため局所抑制に倒す (FLM_GEN_0006 §局所抑制が真に避けられない場合のみ、 理由を併記して例外的に許す)。
         # yamllint disable-line rule:line-length
         uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7
       - name: Configure git auth (bootstrap for private Go module fetch)
@@ -260,6 +261,7 @@ jobs:
       - name: Build flame CLI from PR head
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # if/else を 1 行で書く分岐 shell は line-length 80 を超過する。 改行で `if` body を分割すると ; や && 連鎖の意味が崩れる (= 中間 step の失敗が後続 step の継続を許す経路に化ける) ため、 fail-fast を保つには 1 行で書き切る必要がある (FLM_GEN_0006 §局所抑制が真に避けられない場合のみ、 理由を併記して例外的に許す)。
         # yamllint disable-line rule:line-length
         run: |
           if [[ -d cli/cmd/flame_tool ]]; then devbox run -- sh -c 'cd cli && go build -o ~/.local/bin/flame ./cmd/flame_tool'; else bash .flame-tool/cli/scripts/install.sh; fi
