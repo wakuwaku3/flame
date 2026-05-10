@@ -12,10 +12,11 @@ import (
 
 // 共通権限定数。 fsperm の owner-only 値は機密相当 file 用 (= release artifact) の経路を想定しているため install 経路では別 const を使う。 magic number 出現は本ファイルに集約することで mnd / gosec G306 の検出を 1 か所に閉じる (FLM_GEN_0006)。
 const (
-	filePerm     fs.FileMode = 0o644
-	readOnlyPerm fs.FileMode = 0o444
-	dirPerm      fs.FileMode = 0o755
-	yamlIndent               = 2
+	filePerm        fs.FileMode = 0o644
+	readOnlyPerm    fs.FileMode = 0o444
+	dirPerm         fs.FileMode = 0o755
+	readOnlyDirPerm fs.FileMode = 0o555
+	yamlIndent                  = 2
 )
 
 // VendorRoot は flame harness vendor SoT の repo root 相対 path。
