@@ -24,14 +24,10 @@ type manifestFile struct {
 }
 
 type manifestRoot struct {
-	Harness manifestHarness `yaml:"harness"`
-	AI      manifestAI      `yaml:"ai,omitempty"`
-}
-
-type manifestHarness struct {
-	Source  string   `yaml:"source"`
-	Version string   `yaml:"version"`
-	Ignore  []string `yaml:"ignore,omitempty"`
+	Source  string     `yaml:"source"`
+	Version string     `yaml:"version"`
+	Ignore  []string   `yaml:"ignore,omitempty"`
+	AI      manifestAI `yaml:"ai,omitempty"`
 }
 
 type manifestAI struct {
@@ -61,19 +57,19 @@ func LoadManifest(_ context.Context, repoRoot string) (*Manifest, error) {
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, ex.Wrapf(err, "parse flame.yaml: %s", path)
 	}
-	if raw.Flame.Harness.Source == "" {
-		return nil, ex.Errorf("flame.yaml: flame.harness.source is required")
+	if raw.Flame.Source == "" {
+		return nil, ex.Errorf("flame.yaml: flame.source is required")
 	}
-	if raw.Flame.Harness.Version == "" {
-		return nil, ex.Errorf("flame.yaml: flame.harness.version is required")
+	if raw.Flame.Version == "" {
+		return nil, ex.Errorf("flame.yaml: flame.version is required")
 	}
-	ignore := make(map[string]struct{}, len(raw.Flame.Harness.Ignore))
-	for _, k := range raw.Flame.Harness.Ignore {
+	ignore := make(map[string]struct{}, len(raw.Flame.Ignore))
+	for _, k := range raw.Flame.Ignore {
 		ignore[k] = struct{}{}
 	}
 	return &Manifest{
-		Source:            raw.Flame.Harness.Source,
-		Version:           raw.Flame.Harness.Version,
+		Source:            raw.Flame.Source,
+		Version:           raw.Flame.Version,
 		Ignore:            ignore,
 		Stage1ExtraAgents: append([]string(nil), raw.Flame.AI.PrePush.Stage1ExtraAgents...),
 	}, nil

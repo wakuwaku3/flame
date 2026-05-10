@@ -133,13 +133,13 @@ func writeFixtureRepo(tb testing.TB, root, version string) {
 func writeFlameYAML(tb testing.TB, root, version string, ignore []string) {
 	tb.Helper()
 	var b strings.Builder
-	b.WriteString("---\nflame:\n  harness:\n    source: github.com/wakuwaku3/flame\n    version: ")
+	b.WriteString("---\nflame:\n  source: github.com/wakuwaku3/flame\n  version: ")
 	b.WriteString(version)
 	b.WriteString("\n")
 	if len(ignore) > 0 {
-		b.WriteString("    ignore:\n")
+		b.WriteString("  ignore:\n")
 		for _, ig := range ignore {
-			b.WriteString("      - ")
+			b.WriteString("    - ")
 			b.WriteString(ig)
 			b.WriteString("\n")
 		}

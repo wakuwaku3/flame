@@ -36,19 +36,28 @@ const (
 	MergeArrayUnique MergeArrayStrategy = "unique"
 )
 
-// LockOverlay は副ファイル overlay の lockfile 表現。 内容は副ファイル自体が SoT のため path のみ記録する (FLM_FEA_0003 §flame.lock)。
+// LockOverlay は副ファイル overlay の lockfile 表現。 path に加え 3-way merge の base material として前回 install 時点の overlay 内容 snapshot を持つ (FLM_FEA_0003 §flame.lock)。
 type LockOverlay struct {
-	Path string `yaml:"path"`
+	Path    string `yaml:"path"`
+	Content string `yaml:"content,omitempty"`
 }
 
-// LockFile は flame.lock.files[] の 1 entry。 install copy 経路で配置された各ファイルのレコード。
+// LockInstalled は前回 install 実行時の vendor 取得元 / version / vendor tree hash を記録する (FLM_FEA_0003 §flame.lock)。 version 変更検知 (= 再 fetch の起動条件) と vendor 改変検知 (= drift 検知) のために用いる。 self mode では tree_hash は記録しない (working tree が常時変動するため CI が壊れる)。
+type LockInstalled struct {
+	Source   string `yaml:"source"`
+	Version  string `yaml:"version"`
+	TreeHash string `yaml:"tree_hash,omitempty"`
+}
+
+// LockFile は flame.lock.files[] の 1 entry。 install copy 経路で配置された各ファイルのレコード。 vendor_content は 3-way merge の base (= 前回 install 時点の vendor file 内容 snapshot) として用いる。
 type LockFile struct {
-	Install    string             `yaml:"install"`
-	Vendor     string             `yaml:"vendor"`
-	Merge      MergeStrategy      `yaml:"merge"`
-	Content    string             `yaml:"content"`
-	Overlay    *LockOverlay       `yaml:"overlay,omitempty"`
-	MergeArray MergeArrayStrategy `yaml:"merge_array,omitempty"`
+	Install       string             `yaml:"install"`
+	Vendor        string             `yaml:"vendor"`
+	Merge         MergeStrategy      `yaml:"merge"`
+	Content       string             `yaml:"content"`
+	VendorContent string             `yaml:"vendor_content,omitempty"`
+	Overlay       *LockOverlay       `yaml:"overlay,omitempty"`
+	MergeArray    MergeArrayStrategy `yaml:"merge_array,omitempty"`
 }
 
 // LockEmbed は flame.lock.embeds[] の 1 entry。 取り込み形式 (CLAUDE.md / .envrc / .yamllint) の install 先と vendor target / 取り込み snippet を記録する (FLM_GEN_0007 §repo root における downstream resource の取り込み形式)。
@@ -60,8 +69,9 @@ type LockEmbed struct {
 
 // Lock は flame.lock 全体を表す。
 type Lock struct {
-	Files  []LockFile
-	Embeds []LockEmbed
+	Installed *LockInstalled
+	Files     []LockFile
+	Embeds    []LockEmbed
 }
 
 type lockFileYAML struct {
@@ -69,12 +79,9 @@ type lockFileYAML struct {
 }
 
 type lockRootYAML struct {
-	Harness lockHarnessYAML `yaml:"harness"`
-}
-
-type lockHarnessYAML struct {
-	Files  []LockFile  `yaml:"files"`
-	Embeds []LockEmbed `yaml:"embeds,omitempty"`
+	Installed *LockInstalled `yaml:"installed,omitempty"`
+	Files     []LockFile     `yaml:"files"`
+	Embeds    []LockEmbed    `yaml:"embeds,omitempty"`
 }
 
 // LoadLock は repo root の flame.lock を読み取って Lock を返す。 file が無い場合は空 Lock を返す (初回 install で許容する)。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期 file IO のみ。
@@ -92,8 +99,9 @@ func LoadLock(_ context.Context, repoRoot string) (*Lock, error) {
 		return nil, ex.Wrapf(err, "parse flame.lock: %s", path)
 	}
 	return &Lock{
-		Files:  raw.Flame.Harness.Files,
-		Embeds: raw.Flame.Harness.Embeds,
+		Installed: raw.Flame.Installed,
+		Files:     raw.Flame.Files,
+		Embeds:    raw.Flame.Embeds,
 	}, nil
 }
 
@@ -128,24 +136,35 @@ func encodeLock(lock *Lock) (string, error) {
 
 // buildLockNode は yaml.Node を手組みし、 content を literal block scalar (`|`) で出力するために node style を強制する。
 func buildLockNode(lock *Lock) *yaml.Node {
+	flameFields := []*yaml.Node{}
+	if lock.Installed != nil {
+		flameFields = append(flameFields, scalarNode("installed"), buildInstalledNode(lock.Installed))
+	}
 	files := &yaml.Node{Kind: yaml.SequenceNode, Tag: "", Value: "", Anchor: "", Alias: nil, Content: nil, HeadComment: "", LineComment: "", FootComment: "", Line: 0, Column: 0, Style: 0}
 	for i := range lock.Files {
 		files.Content = append(files.Content, buildFileNode(&lock.Files[i]))
 	}
-	harnessFields := []*yaml.Node{
-		scalarNode("files"),
-		files,
-	}
+	flameFields = append(flameFields, scalarNode("files"), files)
 	if len(lock.Embeds) > 0 {
 		embeds := &yaml.Node{Kind: yaml.SequenceNode, Tag: "", Value: "", Anchor: "", Alias: nil, Content: nil, HeadComment: "", LineComment: "", FootComment: "", Line: 0, Column: 0, Style: 0}
 		for i := range lock.Embeds {
 			embeds.Content = append(embeds.Content, buildEmbedNode(&lock.Embeds[i]))
 		}
-		harnessFields = append(harnessFields, scalarNode("embeds"), embeds)
+		flameFields = append(flameFields, scalarNode("embeds"), embeds)
 	}
-	harness := mappingNode(harnessFields)
-	flame := mappingNode([]*yaml.Node{scalarNode("harness"), harness})
+	flame := mappingNode(flameFields)
 	return mappingNode([]*yaml.Node{scalarNode("flame"), flame})
+}
+
+func buildInstalledNode(installed *LockInstalled) *yaml.Node {
+	fields := []*yaml.Node{
+		scalarNode("source"), scalarNode(installed.Source),
+		scalarNode("version"), scalarNode(installed.Version),
+	}
+	if installed.TreeHash != "" {
+		fields = append(fields, scalarNode("tree_hash"), scalarNode(installed.TreeHash))
+	}
+	return mappingNode(fields)
 }
 
 func buildFileNode(f *LockFile) *yaml.Node {
@@ -155,9 +174,15 @@ func buildFileNode(f *LockFile) *yaml.Node {
 		scalarNode("merge"), scalarNode(string(f.Merge)),
 		scalarNode("content"), literalBlockNode(f.Content),
 	}
+	if f.VendorContent != "" {
+		fields = append(fields, scalarNode("vendor_content"), literalBlockNode(f.VendorContent))
+	}
 	if f.Overlay != nil {
-		overlayNode := mappingNode([]*yaml.Node{scalarNode("path"), scalarNode(f.Overlay.Path)})
-		fields = append(fields, scalarNode("overlay"), overlayNode)
+		overlayFields := []*yaml.Node{scalarNode("path"), scalarNode(f.Overlay.Path)}
+		if f.Overlay.Content != "" {
+			overlayFields = append(overlayFields, scalarNode("content"), literalBlockNode(f.Overlay.Content))
+		}
+		fields = append(fields, scalarNode("overlay"), mappingNode(overlayFields))
 	}
 	if f.MergeArray != "" {
 		fields = append(fields, scalarNode("merge_array"), scalarNode(string(f.MergeArray)))

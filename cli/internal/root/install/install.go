@@ -136,19 +136,20 @@ func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item 
 		return writeErr
 	}
 	entry := LockFile{
-		Install:    filepath.ToSlash(item.InstallPath),
-		Vendor:     filepath.ToSlash(item.VendorPath),
-		Merge:      item.Merge,
-		Content:    string(merged),
-		Overlay:    nil,
-		MergeArray: arrayStrategy,
+		Install:       filepath.ToSlash(item.InstallPath),
+		Vendor:        filepath.ToSlash(item.VendorPath),
+		Merge:         item.Merge,
+		Content:       string(merged),
+		VendorContent: string(vendorBytes),
+		Overlay:       nil,
+		MergeArray:    arrayStrategy,
 	}
 	switch {
 	case overlayPath != "":
-		entry.Overlay = &LockOverlay{Path: overlayPath}
+		entry.Overlay = &LockOverlay{Path: overlayPath, Content: string(overlayBytes)}
 	default:
 		if existing, ok := overlayBy[filepath.ToSlash(item.InstallPath)]; ok {
-			entry.Overlay = &LockOverlay{Path: existing.Path}
+			entry.Overlay = &LockOverlay{Path: existing.Path, Content: existing.Content}
 		}
 	}
 	newLock.Files = append(newLock.Files, entry)
