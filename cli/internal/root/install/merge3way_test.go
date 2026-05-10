@@ -298,16 +298,76 @@ func TestMerge3Way_Replace(t *testing.T) {
 func TestMerge3Way_NestedMapping(t *testing.T) {
 	t.Parallel()
 
-	out, err := Merge3Way(&Merge3WayInput{
+	// Arrange
+	input := &Merge3WayInput{
 		Strategy:     MergeDeep,
 		InstallPath:  "x.yaml",
 		BaseContent:  []byte("linters:\n  enable:\n    - errcheck\n    - govet\n"),
 		TheirContent: []byte("linters:\n  enable:\n    - errcheck\n    - govet\n    - ineffassign\n"),
 		OurContent:   []byte("linters:\n  enable:\n    - errcheck\n    - govet\n    - mylinter\n"),
-	})
+	}
+	// Act
+	out, err := Merge3Way(input)
+	// Assert
 	require.NoError(t, err)
 	assert.Empty(t, out.Conflicts)
 	s := string(out.Content)
 	assert.Contains(t, s, "ineffassign", "missing ineffassign in:\n%s", s)
 	assert.Contains(t, s, "mylinter", "missing mylinter in:\n%s", s)
+}
+
+func TestMerge3Way_UnknownStrategy(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	input := &Merge3WayInput{
+		Strategy:     MergeStrategy("invalid"),
+		InstallPath:  "x.yaml",
+		BaseContent:  nil,
+		TheirContent: []byte("a: 1\n"),
+		OurContent:   nil,
+	}
+	// Act
+	_, err := Merge3Way(input)
+	// Assert
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown merge strategy")
+}
+
+func TestMerge3Way_JSON_VendorRemoved_OurKept_Conflict(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	input := &Merge3WayInput{
+		Strategy:     MergeDeep,
+		InstallPath:  "x.json",
+		BaseContent:  []byte(`{"items":["a","b"]}`),
+		TheirContent: []byte(`{"items":["a"]}`),
+		OurContent:   []byte(`{"items":["a","b"]}`),
+	}
+	// Act
+	out, err := Merge3Way(input)
+	// Assert
+	require.NoError(t, err)
+	require.NotEmpty(t, out.Conflicts)
+	assert.Contains(t, out.Conflicts[0].Description, "their")
+}
+
+func TestMerge3Way_JSON_ScalarBothChanged_Conflict(t *testing.T) {
+	t.Parallel()
+
+	// Arrange
+	input := &Merge3WayInput{
+		Strategy:     MergeDeep,
+		InstallPath:  "x.json",
+		BaseContent:  []byte(`{"a":1}`),
+		TheirContent: []byte(`{"a":2}`),
+		OurContent:   []byte(`{"a":99}`),
+	}
+	// Act
+	out, err := Merge3Way(input)
+	// Assert
+	require.NoError(t, err)
+	require.Len(t, out.Conflicts, 1)
+	assert.Equal(t, "a", out.Conflicts[0].Path)
 }

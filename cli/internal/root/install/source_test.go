@@ -32,6 +32,34 @@ func TestMakeVendorReadOnly(t *testing.T) {
 	})
 }
 
+func TestSyncVendor_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("self mode で vendor 不在は error", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		root := t.TempDir()
+		m := &Manifest{Source: "github.com/wakuwaku3/flame", Version: SelfVersion, Ignore: nil, Stage1ExtraAgents: nil}
+		// Act
+		err := SyncVendor(context.Background(), root, m, &Lock{Installed: nil, Files: nil, Embeds: nil})
+		// Assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "vendor SoT not found in self mode")
+	})
+
+	t.Run("vendor-sync ignored で vendor 不在は error", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		root := t.TempDir()
+		m := &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: map[Feature]struct{}{FeatureVendorSync: {}}, Stage1ExtraAgents: nil}
+		// Act
+		err := SyncVendor(context.Background(), root, m, &Lock{Installed: nil, Files: nil, Embeds: nil})
+		// Assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "vendor-sync` is ignored")
+	})
+}
+
 func TestNeedsRefetch(t *testing.T) {
 	t.Parallel()
 
