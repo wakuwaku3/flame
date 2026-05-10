@@ -2,7 +2,7 @@
 
 ## 背景
 
-- GitHub Release を経由して semver 採番された配布対象を release する一般 policy は [FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) で定義されている。 本 ADR は当該 policy を base に、 flame self における具体実装 (配布対象の具体名・workflow ファイル名・flame CLI subcommand 名・install スクリプト path・dry_run 入力等) のみを規定する
+- GitHub Release を経由して semver 採番された配布対象を release する一般 policy は [FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) で定義されている。 本 ADR は当該 policy を base に、 flame self における構成選択 (配布対象の系統分割 / 実体層 workflow の分離方針 / flame CLI release subcommand の責務階層 / install スクリプトの配置方針 / dry_run の実装方針) と採用経緯を規定する。 具体ファイル名・コマンド名・パス・env 名等の実装詳細は ADR には書かず、 各実装側 (workflow 定義 / flame CLI 実装 / install スクリプト本体 / 関連 module 内ドキュメント) に持たせる ([FLM_GEN_0001](../../../vendor/flame/docs/adr/general/FLM_GEN_0001__adr.md) §決定セクションの記述方針)
 - flame の配布対象 main package は `<module>/cmd/<app_dir>/` に置かれ、 `<app_dir>` は `_tool` suffix を持つ ([FLM_APP_0007](../../../vendor/flame/docs/adr/application/FLM_APP_0007__go.md) §配置)
 - flame の library 配布対象は module ディレクトリ名が `lib` または `_lib` suffix を持つ ([FLM_APP_0007](../../../vendor/flame/docs/adr/application/FLM_APP_0007__go.md) §配置)
 - flame は補助処理を集約する flame CLI を持つ ([FLI_FEA_0002](FLI_FEA_0002__flame_cli.md))
@@ -10,46 +10,45 @@
 
 ## 決定
 
-[FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) の base policy に従いつつ、 flame self では以下の具体選択を採る。
+[FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) の base policy に従いつつ、 flame self では以下の構成を採る。
 
-### 配布対象の具体
+### 配布対象の系統
 
-- **tool 系**: `cli` module の `flame_tool` (= `flame` コマンド) を始めとする `_tool` suffix 付き main package
-- **library 系**: `lib` module を始めとする `lib` / `_lib` suffix を持つ Go module
+- tool 系 (= 配布対象の main package を持つ系統) と library 系 (= 配布対象の Go library module を持つ系統) の双方を持つ
+- いずれも [FLM_APP_0007](../../../vendor/flame/docs/adr/application/FLM_APP_0007__go.md) §配置 が定める命名規約 (`_tool` suffix / `lib` ・ `_lib` suffix) で配布対象を marker する
 
 ### 実体層 workflow
 
 - 系統ごとに独立した実体層 workflow を持つ ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §リリース起動契機)
-  - tool 系: `wf__deploy_tool.yaml`
-  - library 系: `wf__deploy_lib.yaml`
-- 上位 fan-out 実体層 `wf__deploy.yaml` が両者を再利用可能呼出 ([FLM_ENG_0003](../../../vendor/flame/docs/adr/engineering/FLM_ENG_0003__github_actions.md) §ワークフローの分離 §実体層) で並列起動する。 トリガー層は 1 ファイル 1 ジョブのまま `wf__deploy.yaml` を呼ぶ
+- 上位 fan-out 実体層が両者を再利用可能呼出 ([FLM_ENG_0003](../../../vendor/flame/docs/adr/engineering/FLM_ENG_0003__github_actions.md) §ワークフローの分離 §実体層) で並列起動する。 トリガー層は 1 ファイル 1 ジョブのまま fan-out 実体層を呼ぶ
 
 ### flame CLI の release 関連 subcommand
 
-- library 系の Go 公開 API spec 抽出 ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §版番号の決定経路): `flame ci release spec lib <module-path>`
-- tool 系の release 実体: `flame ci release tool`
-- library 系の release 実体: `flame ci release lib`
-- いずれも flame CLI ([FLI_FEA_0002](FLI_FEA_0002__flame_cli.md)) の責務カテゴリ「CI 補助」 配下に置く。 spec 抽出の実装は Go 標準ライブラリ (`go/parser` / `go/ast` / `go/token` 等) で完結させ、 3rd party 依存は採用しない
+- 系統ごとに以下の責務を flame CLI ([FLI_FEA_0002](FLI_FEA_0002__flame_cli.md)) の責務カテゴリ「CI 補助」 配下に置く:
+  - library 系の Go 公開 API spec 抽出 ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §版番号の決定経路)
+  - tool 系の release 実体
+  - library 系の release 実体
+- spec 抽出の実装は Go 標準ライブラリで完結させ、 3rd party 依存は採用しない
 
 ### install スクリプトの配置
 
-- 配布対象アプリケーションごとに install スクリプトを当該 module 内 `<module>/scripts/install.sh` に置く。 flame CLI 自身については `cli/scripts/install.sh` が SoT
-- flame self は public リポジトリで配布するため install スクリプトは anonymous で起動できる。 release asset の取得は private fork / mirror 経路との互換性を維持するため GitHub API の asset id 経由 (`Accept: application/octet-stream`) を採り、 `GITHUB_TOKEN` env もしくは `gh auth token` で token が解決された場合のみ Authorization header を付加する ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §インストール の可視性連動規約に従う単一経路)
+- 配布対象アプリケーションごとに install スクリプトを当該 module 内に置く。 flame CLI 自身についても同方針
+- flame self は public リポジトリで配布するため install スクリプトは anonymous で起動できる。 release asset の取得は private fork / mirror 経路との互換性を維持するため GitHub API の asset id 経由を採り、 token が解決された場合のみ Authorization header を付加する ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §インストール の可視性連動規約に従う単一経路)
 - インストール先 default はユーザ書き込み可能なディレクトリとし、 環境変数で override 可能とする ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §影響: 具体パス・環境変数名は install スクリプト本体に持たせ ADR では抽象 policy のみを保持する)
 
 ### dry_run の実装
 
-- release ワークフローの dry_run ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §リリースノート 末尾の dry-run モード規約) は同じ実体層 workflow (`wf__deploy_tool.yaml` / `wf__deploy_lib.yaml`) に `dry_run` / `prior_tag_override` 入力を持たせ、 `workflow_dispatch` 経由で feature branch から起動できる形に統合する
-- `prior_tag_override` は前回 tag を任意の値に固定して bump 判定経路を再現するための入力で、 dry_run 検証時に release notes 生成の系譜境界を任意の地点に切り替えるために用いる
+- release ワークフローの dry_run ([FLM_FEA_0004](../../../vendor/flame/docs/adr/feature/FLM_FEA_0004__release_policy.md) §リリースノート 末尾の dry-run モード規約) は同じ実体層 workflow に dry-run 入力と前回 tag override 入力を持たせ、 手動起動経路から feature branch で起動できる形に統合する
+- 前回 tag override は前回 tag を任意の値に固定して bump 判定経路を再現するための入力で、 dry_run 検証時に release notes 生成の系譜境界を任意の地点に切り替えるために用いる
 
 ## 影響
 
-- flame self の release は main マージ自動で `wf__deploy.yaml` が起動し、 配下の `wf__deploy_tool.yaml` / `wf__deploy_lib.yaml` が並列で各配布対象を release する
-- flame CLI の release plumbing 関連 subcommand (`flame ci release ...`) は flame CLI 自身に閉じる。 配布対象 library module 側に spec emission の実装は持たない
-- flame バイナリ install は `cli/scripts/install.sh` が `curl ... | bash` 形式で起動できる。 flame self は public のため anonymous で完結し、 private fork / mirror に対しては解決した token を Authorization header に付加して同じ asset id 経由経路で download する
-- release 経路を main マージ前に検証する手段として、 `wf__deploy_tool.yaml` / `wf__deploy_lib.yaml` を `workflow_dispatch` + `dry_run` / `prior_tag_override` で feature branch から起動できる。 別系統の検証用 workflow を保守する必要は無い
-- flame self の `lib` module は library 配布対象でかつ `lib/cmd/<app>_tool/` を持ちうるため、 同 module を入力にした tool 系 / library 系の 2 release が並列で走るが、 tag 名前空間 (`<app_name>/...` と `<module_path>/...`) が分離するため衝突しない
-- 「決定」 で抽象 policy として残した具体実装 (アーカイブ命名フォーマット文字列、 配布対象 OS / arch の個別組合せ、 リリースノート markdown のセクション見出し等) は release ワークフロー定義 / install スクリプト本体 / 関連 module 内ドキュメントに分散して保持される。 これらは仕様変更時に各実装側で更新する
+- flame self の release は main マージ自動で fan-out 実体層 workflow が起動し、 配下の tool 系 / library 系の各実体層 workflow が並列で各配布対象を release する
+- flame CLI の release plumbing 関連 subcommand は flame CLI 自身に閉じる。 配布対象 library module 側に spec emission の実装は持たない
+- flame バイナリ install は flame CLI 自身の install スクリプトが pipe 実行 (`curl ... | bash` 等) で起動できる。 flame self は public のため anonymous で完結し、 private fork / mirror に対しては解決した token を Authorization header に付加して同じ asset id 経由経路で download する
+- release 経路を main マージ前に検証する手段として、 tool / library 各実体層 workflow を手動起動経路 + dry-run / 前回 tag override で feature branch から起動できる。 別系統の検証用 workflow を保守する必要は無い
+- flame self の library module は library 配布対象でかつ tool 系の main package を併せ持ちうるため、 同 module を入力にした tool 系 / library 系の 2 release が並列で走るが、 tag 名前空間が分離するため衝突しない
+- 「決定」 で抽象 policy として残した具体実装は分散して保持される。 典型的には: 配布対象具体 module 名・package 名・コマンド名 (= 各 module 内ドキュメント) 、 実体層 workflow ファイル名・ fan-out 実体層 / トリガー層のファイル名 (= GitHub Actions workflow 定義側) 、 release 関連 subcommand の具体名 (= flame CLI 実装側) 、 install スクリプトの具体 path・ install 先 default 値・ override 環境変数名・ Authorization 用 env 名・ HTTP header 値・ token 解決経路 (= install スクリプト本体) 、 dry-run / 前回 tag override の具体 input 名・ 手動起動経路の具体トリガー名 (= release ワークフロー定義) 、 アーカイブ命名フォーマット文字列・ 配布対象 OS / arch の個別組合せ・ リリースノート markdown のセクション見出し等 (= 各実装側) 。 これらは仕様変更時に各実装側で更新する
 
 ## 評価
 
