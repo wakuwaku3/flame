@@ -13,7 +13,6 @@ import (
 	"github.com/wakuwaku3/flame/lib/ex"
 )
 
-// Run は `flame install` の主処理。 repo root を入力に取り、 (1) vendor 同期 / (2) install copy 合成 / (3) embed snippet 配置 / (4) flame.lock 生成 / (5) chmod 444 / (6) .gitignore / (7) plugin 登録 を順序実行する。
 func Run(ctx context.Context, repoRoot string, stdout, stderr io.Writer) error {
 	m, err := LoadManifest(ctx, repoRoot)
 	if err != nil {
@@ -171,7 +170,6 @@ func executeInstallCopy(ctx context.Context, repoRoot string, m *Manifest, item 
 	return nil
 }
 
-// readOverlay は install path に対応する `<basename>.flame-overlay.<ext>` を読み込む。 file が存在しなければ (nil, "", nil) を返す。
 func readOverlay(_ context.Context, repoRoot, installPath string) (content []byte, overlayPath string, err error) {
 	overlayRel := overlayPathFor(installPath)
 	overlayAbs := filepath.Join(repoRoot, overlayRel)

@@ -16,11 +16,8 @@ import (
 type MergeStrategy string
 
 const (
-	// MergeDeep は構造化 deep merge (YAML / JSON)。
-	MergeDeep MergeStrategy = "deep"
-	// MergeAppend は line-based 3-way merge (base = 前回 vendor、 their = 現在の vendor、 our = 現在の overlay)。
-	MergeAppend MergeStrategy = "append"
-	// MergeReplace は overlay 不可で vendor のみで上書き (生成物に使う)。
+	MergeDeep    MergeStrategy = "deep"
+	MergeAppend  MergeStrategy = "append"
 	MergeReplace MergeStrategy = "replace"
 )
 
@@ -193,7 +190,6 @@ func mappingNode(content []*yaml.Node) *yaml.Node {
 	return &yaml.Node{Kind: yaml.MappingNode, Tag: "", Value: "", Anchor: "", Alias: nil, Content: content, HeadComment: "", LineComment: "", FootComment: "", Line: 0, Column: 0, Style: 0}
 }
 
-// FormatStrategySummary は debug 出力 / status 表示用の summary 文字列を組み立てる。
 func FormatStrategySummary(lock *Lock) string {
 	return fmt.Sprintf("files=%d embeds=%d", len(lock.Files), len(lock.Embeds))
 }

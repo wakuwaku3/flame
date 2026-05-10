@@ -19,7 +19,6 @@ const (
 	yamlIndent                  = 2
 )
 
-// VendorRoot は flame harness vendor SoT の repo root 相対 path。
 const VendorRoot = "vendor/flame"
 
 // flameTrgPrefix は GitHub Actions トリガー層 workflow を install 先で命名する prefix (FLM_FEA_0003 §workflow の install 命名規約)。
@@ -74,7 +73,6 @@ type Plan struct {
 	Items []PlanItem
 }
 
-// BuildPlan は repo root と manifest を受けて vendor SoT を walk し、 各 file を classify した Plan を返す。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期 file IO のみ。
 func BuildPlan(_ context.Context, repoRoot string, m *Manifest) (*Plan, error) {
 	vendorAbs := filepath.Join(repoRoot, VendorRoot)
 	if _, err := os.Stat(vendorAbs); err != nil {
