@@ -56,7 +56,6 @@ func TestRun(t *testing.T) {
 		// .gitignore に vendor block 追加
 		gitignore := mustRead(t, filepath.Join(root, ".gitignore"))
 		assert.Contains(t, string(gitignore), "vendor/*")
-		assert.Contains(t, string(gitignore), "!vendor/flame")
 
 		// .claude/settings.json に plugin 登録
 		settings := mustRead(t, filepath.Join(root, ".claude", "settings.json"))
@@ -113,6 +112,15 @@ func TestRun(t *testing.T) {
 		second := mustRead(t, filepath.Join(root, "flame.lock"))
 
 		assert.Equal(t, string(first), string(second))
+	})
+
+	t.Run("flame.yaml が無い repo root では error (上方向探索しない)", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+
+		err := install.Run(context.Background(), root, os.Stdout, os.Stderr)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "flame.yaml")
 	})
 }
 

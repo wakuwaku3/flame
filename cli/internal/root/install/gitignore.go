@@ -11,10 +11,10 @@ import (
 	"github.com/wakuwaku3/flame/lib/ex"
 )
 
-// vendorGitignoreBlock は flame.gitignore に追加する vendor 領域の ignore ブロック (FLM_FEA_0003 §vendor の git 追跡)。 親 dir 全体を ignore すると Git が下に降りないため、 *  で直接子のみを ignore してから !vendor/flame で flame だけ unignore する。
-const vendorGitignoreBlock = "# flame harness は vendor/flame/ 配下を SoT として追跡する (FLM_FEA_0003)。\n# 親 dir 全体を ignore すると Git が下に降りないため、 *  で直接子のみを\n# ignore してから !vendor/flame で flame だけ unignore する。\nvendor/*\n!vendor/flame\n"
+// vendorGitignoreBlock は初回 install 時に repo root の .gitignore に scaffold する block (FLM_FEA_0003 §利用側 setup 手順)。 vendor 配下は git untracked にする方針へ転換したため `!vendor/flame` は持たない (再取得経路は SyncVendor が clone でカバーする)。
+const vendorGitignoreBlock = "# flame harness が install 時に追加する block (FLM_FEA_0003)\ntmp\n.devbox\n.direnv\n.local\n.claude/.ccache\n.claude/scheduled_tasks.lock\nvendor/*\n"
 
-// applyGitignore は repo root の .gitignore に vendor/* と !vendor/flame を冪等追記する。 既に行が含まれていれば no-op。 manifest.ignore に `.gitignore` が含まれていれば no-op (caller 側で skip 判定済を想定)。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期的な local file IO のみで cancel 経路を持たない。
+// applyGitignore は repo root の .gitignore に scaffold block を冪等追記する。 既に `vendor/*` 行が含まれていれば no-op。 manifest.ignore に `.gitignore` が含まれていれば no-op (caller 側で skip 判定済を想定)。 ctx は IO を含む関数 signature 規約 (FLM_APP_0007 §context 伝搬) に従い受け取るが本処理は同期的な local file IO のみで cancel 経路を持たない。
 func applyGitignore(_ context.Context, repoRoot string) error {
 	path := filepath.Join(repoRoot, ".gitignore")
 	existing, err := os.ReadFile(path)
@@ -35,8 +35,12 @@ func applyGitignore(_ context.Context, repoRoot string) error {
 }
 
 func hasVendorIgnoreBlock(content []byte) bool {
-	s := string(content)
-	return strings.Contains(s, "vendor/*") && strings.Contains(s, "!vendor/flame")
+	for _, line := range strings.Split(string(content), "\n") {
+		if strings.TrimSpace(line) == "vendor/*" {
+			return true
+		}
+	}
+	return false
 }
 
 func appendGitignoreBlock(existing []byte) []byte {
