@@ -45,6 +45,27 @@ tools: Read, Bash, Grep, Glob
 
 違反がなければ `No findings.` とだけ返す。
 
+## 指摘しない対象 (merge ブロッカー基準)
+
+以下に該当する findings は **出力しない**。 これらは PR を merge する判断を変えない雑音であり、 修正サイクルを累積させて merge 到達を阻害する。
+
+- rule の `description` 文言の言い回し改善 (領域名 + ADR ID として機能するなら表現は問わない)
+- rule 本体の文章スタイル・語順・読点・改行位置
+- ADR 側と rule 側で語彙が完全一致していない (= 同義の別表現) 程度の差
+- `paths:` glob の表記スタイル (`**/*.go` vs `*.go` 等) のうち実効パターンが等価なもの
+- 「ADR が今後広がりそう」 系の予期に基づく rule 拡張提案
+- rule の category / 配置位置の好み (現行 rule が当該 ADR を mapping できているなら現状維持)
+
+指摘対象は次のいずれかに限る:
+
+- ADR リンクの実害ある breakage (リンク切れ / 誤った ADR ID / 旧 path への参照)
+- 新規 ADR に対応する rule が一切存在しない (= 新規 ADR 追加時の rule 同期漏れ)
+- ADR をリネーム / 削除したのに rule が古い参照のまま残っている
+- rule 本体に独立した規範的記述 (チェックリスト・1 行要約・スローガン・追加ルール等) が混入している ([FLM_GEN_0001](../../../vendor/flame/docs/adr/general/FLM_GEN_0001__adr.md) §ルール記述の単一情報源 違反)
+- `paths:` glob が ADR 決定範囲と乖離していて attach されるべきファイルが拾えない / 拾い過ぎる
+
+判断が拮抗する場合は **`No findings.` 側に倒す**。
+
 ## 注意
 
 - 一般的な技術プラクティス (可読性・命名等) は general-practices-reviewer subagent の責務。 ここでは扱わない
