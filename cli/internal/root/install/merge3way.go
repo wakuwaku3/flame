@@ -151,9 +151,16 @@ func merge3WayYAMLMapping(base, their, our *yaml.Node, path string) (*yaml.Node,
 			out.Content = append(out.Content, scalarKeyNode(k), merged)
 			conflicts = append(conflicts, childConflicts...)
 		case theirHas && !ourHas:
-			if !baseHas || nodesEqual(base.Content[baseIdx+1], their.Content[theirIdx+1]) {
+			if !baseHas {
+				// vendor が新規 key を追加し利用者は触れていない (= line-based / sequence merge と対称)。 vendor の追加を install 結果に伝播させる。
+				out.Content = append(out.Content, scalarKeyNode(k), their.Content[theirIdx+1])
 				continue
 			}
+			if nodesEqual(base.Content[baseIdx+1], their.Content[theirIdx+1]) {
+				// vendor 不変 + 利用者削除 → 利用者の削除を尊重する。
+				continue
+			}
+			conflicts = append(conflicts, MergeConflict{Path: childPath, Description: "their (vendor) changed; our (overlay) removed"})
 			out.Content = append(out.Content, scalarKeyNode(k), their.Content[theirIdx+1])
 		case !theirHas && ourHas:
 			if !baseHas || nodesEqual(base.Content[baseIdx+1], our.Content[ourIdx+1]) {
@@ -363,9 +370,14 @@ func merge3WayJSONMap(base, their, our map[string]any, path string) (map[string]
 			out[k] = merged
 			conflicts = append(conflicts, childConflicts...)
 		case theirHas && !ourHas:
-			if !baseHas || jsonValuesEqual(bv, tv) {
+			if !baseHas {
+				out[k] = tv
 				continue
 			}
+			if jsonValuesEqual(bv, tv) {
+				continue
+			}
+			conflicts = append(conflicts, MergeConflict{Path: childPath, Description: "their (vendor) changed; our (overlay) removed"})
 			out[k] = tv
 		case !theirHas && ourHas:
 			if !baseHas || jsonValuesEqual(bv, ov) {

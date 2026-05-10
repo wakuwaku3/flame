@@ -114,7 +114,8 @@ func cleanupTempDir(dir string) {
 
 func gitClone(ctx context.Context, source, version, dst string) error {
 	url := normalizeGitURL(source)
-	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", version, url, dst)
+	// `--` separator は、 url / version が `-` 始まりだった場合に git が option flag として誤解釈する経路を塞ぐ (argument injection 防御)。
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", version, "--", url, dst)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return ex.Wrapf(err, "git clone %s@%s failed: %s", url, version, strings.TrimSpace(string(out)))

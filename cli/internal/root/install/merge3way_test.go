@@ -103,6 +103,69 @@ func TestMerge3Way_YAML_Sequence(t *testing.T) {
 	})
 }
 
+func TestMerge3Way_YAML_Mapping_VendorAddsKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("vendor が新規 key 追加 + overlay は触れていない → vendor の key が install 結果に伝播する", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		input := &Merge3WayInput{
+			Strategy:     MergeDeep,
+			InstallPath:  "x.yaml",
+			BaseContent:  []byte("a: 1\n"),
+			TheirContent: []byte("a: 1\nb: 2\n"),
+			OurContent:   []byte("a: 1\n"),
+		}
+		// Act
+		out, err := Merge3Way(input)
+		// Assert
+		require.NoError(t, err)
+		assert.Empty(t, out.Conflicts)
+		assert.Equal(t, "a: 1\nb: 2\n", string(out.Content))
+	})
+
+	t.Run("vendor が値変更 + overlay が key を削除 → conflict (vendor 値を出力)", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		input := &Merge3WayInput{
+			Strategy:     MergeDeep,
+			InstallPath:  "x.yaml",
+			BaseContent:  []byte("a: 1\n"),
+			TheirContent: []byte("a: 2\n"),
+			OurContent:   []byte("{}\n"),
+		}
+		// Act
+		out, err := Merge3Way(input)
+		// Assert
+		require.NoError(t, err)
+		require.Len(t, out.Conflicts, 1)
+		assert.Equal(t, "a", out.Conflicts[0].Path)
+		assert.Contains(t, out.Conflicts[0].Description, "their (vendor) changed")
+	})
+}
+
+func TestMerge3Way_JSON_VendorAddsKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("vendor が新規 key 追加 + overlay は触れていない → vendor の key が install 結果に伝播する", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		input := &Merge3WayInput{
+			Strategy:     MergeDeep,
+			InstallPath:  "x.json",
+			BaseContent:  []byte(`{"a":1}`),
+			TheirContent: []byte(`{"a":1,"b":2}`),
+			OurContent:   []byte(`{"a":1}`),
+		}
+		// Act
+		out, err := Merge3Way(input)
+		// Assert
+		require.NoError(t, err)
+		assert.Empty(t, out.Conflicts)
+		assert.Contains(t, string(out.Content), `"b"`)
+	})
+}
+
 func TestMerge3Way_YAML_Mapping(t *testing.T) {
 	t.Parallel()
 

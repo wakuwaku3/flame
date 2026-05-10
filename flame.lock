@@ -530,19 +530,6 @@ flame:
             type: object
             description: flame harness が参照する repo 固有設定の単一 namespace.
             required:
-              - harness
-            additionalProperties: false
-            properties:
-              harness:
-                $ref: "#/$defs/harness"
-              ai:
-                $ref: "#/$defs/ai"
-        $defs:
-          harness:
-            type: object
-            description: |
-              vendor チャネルの取得元と version (= 不変情報 = 手動編集で更新するメタデータ).
-            required:
               - source
               - version
             additionalProperties: false
@@ -564,16 +551,34 @@ flame:
                     description: harness の source 提供元 repo を示す特別マーカー.
               ignore:
                 type: array
-                description: flame install の通常工程のうち skip するものの list.
+                description: flame install の通常工程のうち skip するものの list (機能単位).
                 $comment: |
-                  items.enum は FLM_FEA_0003 §flame.yaml (manifest) の flame.harness.ignore
-                  valid value list と同期する. 拡張時は ADR を SoT として先に改訂し当該 enum
-                  を追従させる.
+                  items.enum は FLM_FEA_0003 §機能単位 ignore の機能 ID 一覧 と同期する.
+                  拡張時は ADR を SoT として先に改訂し、 CLI 側 install.AllFeatures() と
+                  当該 enum の双方を追従させる.
                 items:
                   enum:
-                    - .gitignore
-                    - .claude/plugins
+                    - vendor-sync
+                    - vendor-readonly
+                    - read-only
+                    - gitignore
+                    - claude/plugins
+                    - trigger-workflow
+                    - claude/rules
+                    - claude/skills
+                    - golangci-lint
+                    - markdown-lint
+                    - shellcheck
+                    - devbox
+                    - vscode
+                    - adr
+                    - embed/claude-md
+                    - embed/envrc
+                    - embed/yamllint
                 uniqueItems: true
+              ai:
+                $ref: "#/$defs/ai"
+        $defs:
           ai:
             type: object
             description: |
@@ -616,19 +621,6 @@ flame:
             type: object
             description: flame harness が参照する repo 固有設定の単一 namespace.
             required:
-              - harness
-            additionalProperties: false
-            properties:
-              harness:
-                $ref: "#/$defs/harness"
-              ai:
-                $ref: "#/$defs/ai"
-        $defs:
-          harness:
-            type: object
-            description: |
-              vendor チャネルの取得元と version (= 不変情報 = 手動編集で更新するメタデータ).
-            required:
               - source
               - version
             additionalProperties: false
@@ -650,16 +642,34 @@ flame:
                     description: harness の source 提供元 repo を示す特別マーカー.
               ignore:
                 type: array
-                description: flame install の通常工程のうち skip するものの list.
+                description: flame install の通常工程のうち skip するものの list (機能単位).
                 $comment: |
-                  items.enum は FLM_FEA_0003 §flame.yaml (manifest) の flame.harness.ignore
-                  valid value list と同期する. 拡張時は ADR を SoT として先に改訂し当該 enum
-                  を追従させる.
+                  items.enum は FLM_FEA_0003 §機能単位 ignore の機能 ID 一覧 と同期する.
+                  拡張時は ADR を SoT として先に改訂し、 CLI 側 install.AllFeatures() と
+                  当該 enum の双方を追従させる.
                 items:
                   enum:
-                    - .gitignore
-                    - .claude/plugins
+                    - vendor-sync
+                    - vendor-readonly
+                    - read-only
+                    - gitignore
+                    - claude/plugins
+                    - trigger-workflow
+                    - claude/rules
+                    - claude/skills
+                    - golangci-lint
+                    - markdown-lint
+                    - shellcheck
+                    - devbox
+                    - vscode
+                    - adr
+                    - embed/claude-md
+                    - embed/envrc
+                    - embed/yamllint
                 uniqueItems: true
+              ai:
+                $ref: "#/$defs/ai"
+        $defs:
           ai:
             type: object
             description: |

@@ -10,6 +10,7 @@ paths:
   - plugins/**
   - .github/workflows/wf__*.yaml
   - .github/workflows/flame-trg__*.yaml
+  - .gitignore
 ---
 
 # vendor SoT 側 rule への参照
