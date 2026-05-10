@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.2/.schema/devbox.schema.json",
+  "packages": [
+    "act@0.2.87",
+    "actionlint@1.7.12",
+    "gh@2.91.0",
+    "go@1.26.2",
+    "golangci-lint@2.11.4",
+    "jq@1.8.1",
+    "markdownlint-cli2@0.21.0",
+    "shellcheck@0.11.0",
+    "yamllint@1.37.1",
+    "yq-go@4.53.2"
+  ],
+  "shell": {
+    "init_hook": [
+      "bash vendor/flame/devbox/init.sh"
+    ]
+  }
+}

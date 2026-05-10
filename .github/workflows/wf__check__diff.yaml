@@ -1,0 +1,105 @@
+---
+# 実体層 ワークフロー: base_sha / head_sha を 3 ドット diff で比較し、変更
+# ファイル一覧と種別ごとの matrix entry を JSON で出力する単機能 reusable
+# workflow。wf__check.yaml が消費する。
+#
+# FLM_ENG_0003 §検査対象ファイルの決定 (3 ドット diff、--diff-filter=ACMR、
+# 固定 SHA 入力) および §最小 clone (fetch-depth: 0 を使わず PR head は
+# refs/pull/<n>/head 経由 + base SHA は個別 fetch) に従う。
+# 実装は flame CLI の `ci check detect` に集約済 (FLM_FEA_0005 §責務範囲: CI
+# 補助 — diff 計算 + bucketize 結果を 1 step で emit)。
+
+name: check-diff
+
+# yamllint disable-line rule:truthy
+on:
+  workflow_call:
+    inputs:
+      base_sha:
+        description: 比較元の固定 SHA
+        required: true
+        type: string
+      head_sha:
+        description: 比較先の固定 SHA
+        required: true
+        type: string
+      fetch_ref:
+        description: >-
+          HEAD 側 deepen の対象 ref (例 `refs/pull/<N>/head`)。
+          空文字なら ref を絞らず全 ref を deepen する
+        required: false
+        type: string
+        default: ''
+    outputs:
+      files:
+        description: 変更ファイル名の JSON 配列 (ACMR のみ、削除は除外)
+        value: ${{ jobs.diff.outputs.files }}
+      matrix:
+        description: >-
+          checker matrix entry の JSON ({include:[{checker, files}]})。
+          checker は flame check run の bucket-key
+        value: ${{ jobs.diff.outputs.matrix }}
+      has_work:
+        description: 検査対象 0 件のとき false / 1 件以上のとき true
+        value: ${{ jobs.diff.outputs.has_work }}
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: 比較元の固定 SHA
+        required: true
+        type: string
+      head_sha:
+        description: 比較先の固定 SHA
+        required: true
+        type: string
+      fetch_ref:
+        description: >-
+          HEAD 側 deepen の対象 ref (例 `refs/pull/<N>/head`)。
+          空文字なら ref を絞らず全 ref を deepen する
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  diff:
+    name: wf__check__diff / diff
+    runs-on: ubuntu-latest
+    outputs:
+      files: ${{ steps.compute.outputs.files }}
+      matrix: ${{ steps.compute.outputs.matrix }}
+      has_work: ${{ steps.compute.outputs.has_work }}
+    steps:
+      # actions/checkout v6.0.2
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          # 固定 SHA で head のみを最小 clone (FLM_ENG_0003 §最小 clone)。
+          # base SHA は flame ci check detect が必要時に個別 fetch する。
+          ref: ${{ inputs.head_sha }}
+      # flame CLI を head の cli/scripts/install.sh で取得し、 後続 step
+      # から changed-files 計算経路を `flame ci check detect` で起動する。
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Compute changed file list and checker matrix
+        id: compute
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          # FETCH_REF 経由で git fetch --deepen の対象 ref を 1 本に絞る。
+          # トリガー層が `refs/pull/<N>/head` を渡す前提 (空文字なら fallback
+          # で remote の全 ref が deepen される)。
+          FETCH_REF: ${{ inputs.fetch_ref }}
+          # gh api compare で merge_base / ahead_by を取得するための gh 認証
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: flame ci check detect "$GITHUB_OUTPUT"

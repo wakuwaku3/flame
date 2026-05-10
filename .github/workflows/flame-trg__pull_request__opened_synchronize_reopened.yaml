@@ -1,0 +1,42 @@
+---
+# トリガー層 ワークフロー: pull_request の activity types
+# (opened / synchronize / reopened) を受けて wf__check.yaml を workflow_call
+# で呼ぶだけの薄い層。検査ロジックは持たない (FLM_ENG_0003 §トリガー層)。
+#
+# 関連: docs/adr/engineering/FLM_ENG_0003__github_actions.md
+
+name: pr-check
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check:
+    name: trg__pull_request__opened_synchronize_reopened / check
+    # flame self の dogfooding 経路では PR head の `.github/workflows/wf__check.yaml`
+    # を直接参照することで、 PR 自体が wf__check / wf__check__diff / flame CLI を
+    # 更新するケースで CI 検査を PR 内容で行えるようにする (FLM_FEA_0003 §dogfooding /
+    # FLI_FEA_0003)。 vendor SoT (`vendor/flame/.github/workflows/trg__*.yaml`) は
+    # 利用側 repo 用に絶対参照 (`wakuwaku3/flame/...@<tag>`) を維持する。
+    uses: ./.github/workflows/wf__check.yaml
+    permissions:
+      # FLM_ENG_0003 §トリガー層 により top-level `permissions:` は禁止で、
+      # `jobs.<id>.permissions` のみが認められた配置。 contents は reusable
+      # workflow 側の checkout / diff 計算で read を要する。 pull-requests
+      # は wf__label__path.yaml のラベル付与経路 (FLM_FEA_0002) のために
+      # write を grant し、 同 repo PR では reusable 側へ伝搬する。 fork PR
+      # ではデフォルトで read-only に絞られ (FLM_ENG_0003 §評価) write 要求
+      # が無視されるため、 fork 経由で書き込みが起こることはない。
+      contents: read
+      pull-requests: write
+    with:
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
+      # GitHub が PR ごとに自動生成する read-only ref。 wf__check__diff 内部の
+      # `flame ci check detect` が `git fetch --deepen` の対象を 1 本の ref
+      # に絞るために使う (FLM_ENG_0003 §最小 clone)。
+      fetch_ref: refs/pull/${{ github.event.pull_request.number }}/head
+      # path-based ラベル付与 (FLM_FEA_0002) で対象 PR を識別するために渡す。
+      pr_number: ${{ github.event.pull_request.number }}

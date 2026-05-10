@@ -1,0 +1,255 @@
+---
+# 実体層 ワークフロー: PR を契機に走る検査と side-effect の集約点。
+# トリガー層 (trg__pull_request__*) から呼ばれる主入口で、 内部で
+# wf__check__diff.yaml を呼んで変更ファイル一覧と種別 matrix を取得し、 種別
+# ごと並列の静的検査 (FLM_ENG_0003) と PR への module label 付与
+# (FLM_ENG_0004) を並列に走らせる。
+#
+# 構成ジョブ (FLM_ENG_0003 §ジョブの命名 によりすべて `name:` 必須):
+#   - diff:    wf__check__diff.yaml への workflow_call で変更ファイル一覧と
+#              種別ごとの matrix entry を取得
+#   - check:   matrix で per-type checker を flame CLI 経由で実行 (head 内容を
+#              head 実装で検査)
+#   - noop:    has_work=false 時の固定 success ジョブ (flame ci noop)
+#   - label:   wf__label.yaml への workflow_call で PR に module label 付与
+#              (PR 由来でない workflow_dispatch / fork PR は skip)
+#   - summary: 上記の result を集約し branch protection 用の固定名 status
+#              として顕在化させる (= `check / summary`)
+#
+# `run:` 内には非自明な shell ロジックを置かず flame CLI の subcommand 起動に
+# 限定する (FLM_ENG_0003 §inline shell の制限 / FLM_FEA_0005 §責務範囲: cli は
+# cli/scripts/install.sh と .github/workflows/tests/*.sh 以外の shell を呼ばない)。
+#
+# 第三者 actions は immutable な commit SHA に pin する (mutable tag だと
+# upstream を侵されたときに任意コードが走る)。tag 表記はコメントとして残す。
+
+name: check
+
+permissions:
+  contents: read
+
+# yamllint disable-line rule:truthy
+on:
+  workflow_call:
+    inputs:
+      base_sha:
+        description: 比較元の固定 SHA
+        required: true
+        type: string
+      head_sha:
+        description: 比較先の固定 SHA
+        required: true
+        type: string
+      fetch_ref:
+        description: >-
+          HEAD 側 deepen の対象 ref (例 `refs/pull/<N>/head`)。
+          wf__check__diff へ素通し
+        required: false
+        type: string
+        default: ''
+      pr_number:
+        description: >-
+          ラベル付与対象の PR 番号。 空文字の場合 label ジョブは skip される
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: 比較元の固定 SHA
+        required: true
+        type: string
+      head_sha:
+        description: 比較先の固定 SHA
+        required: true
+        type: string
+      fetch_ref:
+        description: >-
+          HEAD 側 deepen の対象 ref (例 `refs/pull/<N>/head`)。
+          wf__check__diff へ素通し
+        required: false
+        type: string
+        default: ''
+      pr_number:
+        description: >-
+          ラベル付与対象の PR 番号。 空文字の場合 label ジョブは skip される
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  diff:
+    name: wf__check / diff
+    uses: wakuwaku3/flame/.github/workflows/wf__check__diff.yaml@main
+    with:
+      base_sha: ${{ inputs.base_sha }}
+      head_sha: ${{ inputs.head_sha }}
+      fetch_ref: ${{ inputs.fetch_ref }}
+
+  check:
+    name: wf__check / check (${{ matrix.checker }})
+    needs: diff
+    if: needs.diff.outputs.has_work == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.diff.outputs.matrix) }}
+    steps:
+      # `pull_request` トリガーのため workflow 定義・scripts・devbox manifest
+      # 等はすべて PR head 由来で実行される。head_sha (= refs/pull/<n>/head
+      # 相当の固定 SHA) を作業ディレクトリへ最小 clone する。fork PR では
+      # デフォルト GITHUB_TOKEN が read-only に絞られ base repo の secret も
+      # 注入されないため、 base/head の trust 境界を CI 実装側で持たず、
+      # checker は head 実装で head 内容を検査する (FLM_ENG_0003 §評価)。
+      # actions/checkout v6.0.2
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ inputs.head_sha }}
+      # jetify-com/devbox-install-action v0.15.0。 当 action 内部の
+      # verification step (`devbox run -- echo`) でも devbox.json の init_hook
+      # (vendor/flame/devbox/init.sh) が走り gh api を起動するため、
+      # GH_TOKEN を env として渡す。
+      - name: Install devbox
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # yamllint disable-line rule:line-length
+        uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7
+      # flame CLI を head の cli/scripts/install.sh で取得し、 後続 step
+      # から checker dispatch 経路を `flame check run` で起動する。
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      # head build 経路は cli が depend する private Go module
+      # (`github.com/wakuwaku3/flame/lib`) の fetch に git の URL rewrite を
+      # 必要とするため、 flame CLI install よりも前に bootstrap として直接
+      # git config を入れる (`flame ci configure-go-auth` は flame CLI が無いと
+      # 起動できないため再現できず、 bootstrap 経路では git config 直書きを採用)。
+      - name: Configure git auth (bootstrap for private Go module fetch)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git config --global "url.https://x-access-token:${GH_TOKEN}@github.com/.insteadOf" "https://github.com/"
+      # PR head に flame CLI ソース (cli/cmd/flame_tool/) が存在する場合 (= flame self
+      # repo の dogfooding 経路) は head から `go build` で flame CLI を生成する。
+      # PR が CLI 自体を変更している自己更新のケースで検査側に PR 内容を反映させる
+      # ため (= main の released binary は当該変更を未反映)。 利用側 repo (= flame
+      # self 以外) では cli/cmd/flame_tool/ が存在しないため、 main からの release
+      # asset 取得経路 (.flame-tool/cli/scripts/install.sh) にフォールバックする。
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # yamllint disable-line rule:line-length
+        run: |
+          if [[ -d cli/cmd/flame_tool ]]; then devbox run -- sh -c 'cd cli && go build -o ~/.local/bin/flame ./cmd/flame_tool'; else bash .flame-tool/cli/scripts/install.sh; fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # private な Go module fetch (cli が依存する `github.com/wakuwaku3/flame/lib`
+      # 等) のため、 actions/checkout の repo-local 認証では届かない gopath
+      # 配下の git clone に届く global の credential を入れる。 GOPRIVATE は
+      # devbox.json の env で指定済み。
+      - name: Configure git auth for private Go module fetch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: flame ci configure-go-auth
+      # CI 層は diagnose mode 固定 (FLM_FEA_0001 §起動モード)。 default も
+      # diagnose だが、 意図を明示するため env で指定。 `devbox run --` 経由で
+      # 起動するのは、 markdownlint-cli2 / golangci-lint / actionlint /
+      # yamllint / shellcheck / yq といった devbox-managed binary を flame check
+      # 内部の exec で解決させるため。 jetify-com/devbox-install-action は
+      # devbox CLI を入れるのみで shellenv を後続 step に export しないため、
+      # subsequent step では明示的に `devbox run` で wrap する必要がある。
+      - name: Run ${{ matrix.checker }}
+        env:
+          FLAME_CHECKER_MODE: diagnose
+          FILES_JSON: ${{ toJson(matrix.files) }}
+          # `${{ ... }}` 展開を `run:` 本文に直接埋め込まない (FLM_ENG_0003
+          # §inline shell の制限)。 matrix.checker は wf__check__diff 由来の
+          # 固定 list だが、 ADR §決定 は injection 余地の有無に関係なく
+          # 一律 env 経由を要求するため CHECKER で受ける。
+          CHECKER: ${{ matrix.checker }}
+          # devbox run が devbox.json の init_hook (gh api 経由の flame CLI
+          # idempotent install/update) を起動するため、 当該 init_hook 内 gh
+          # 認証用に GH_TOKEN を渡す。
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: devbox run -- flame check run "$CHECKER"
+
+  noop:
+    name: wf__check / noop
+    needs: diff
+    if: needs.diff.outputs.has_work == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v6.0.2 — head 由来の cli/scripts/install.sh を取得する。
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: No files to check
+        run: flame ci noop 'no changed files match any registered content type'
+
+  label:
+    # path-based ラベル付与経路 (FLM_FEA_0002)。 PR 番号が無い workflow_dispatch
+    # 起動時、 および fork PR (head.repo.full_name が base 側 repo と異なる)
+    # では skip する。 fork PR ではデフォルト GITHUB_TOKEN が read-only に
+    # 絞られるため (FLM_ENG_0003 §評価) label 付与は通らない。
+    name: wf__check / label
+    needs: diff
+    # yamllint disable-line rule:line-length
+    if: inputs.pr_number != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      # 親 workflow の top-level permissions が contents: read のため、
+      # reusable 呼出側ジョブで pull-requests: write を明示する。 caller 側
+      # (trg__pull_request__opened_synchronize_reopened.yaml) でも
+      # pull-requests: write を grant して伝搬させる。
+      contents: read
+      pull-requests: write
+    uses: wakuwaku3/flame/.github/workflows/wf__label__path.yaml@main
+    with:
+      files: ${{ needs.diff.outputs.files }}
+      pr_number: ${{ inputs.pr_number }}
+
+  summary:
+    name: wf__check / summary
+    needs: [diff, check, noop, label]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v6.0.2
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # flame CLI を PR head の cli/scripts/install.sh で取得し、 後続 step
+      # から checker matrix 結果集約経路を `flame ci check summary` で起動する。
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Roll up diff / check / noop / label results
+        env:
+          BUCKET_RESULT: ${{ needs.diff.result }}
+          CHECK_RESULT: ${{ needs.check.result }}
+          NOOP_RESULT: ${{ needs.noop.result }}
+          LABEL_RESULT: ${{ needs.label.result }}
+        run: flame ci check summary

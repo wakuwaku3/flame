@@ -1,0 +1,74 @@
+---
+# 実体層 ワークフロー: PR の変更ファイル一覧から影響 module を導出し、
+# `module/<name>` 形式の label を自動付与するパスベースラベル付与経路
+# (FLM_FEA_0002)。 label 自体の規約は FLM_ENG_0004 を参照する。
+#
+# 構成ジョブ (FLM_ENG_0003 §ジョブの命名 によりすべて `name:` 必須):
+#   - apply: 影響 module を計算し repo に label を保証・PR に付与
+#
+# 第三者 actions は immutable な commit SHA に pin する (mutable tag 経由で
+# upstream を侵されたときに任意コードが走る)。tag 表記はコメントとして残す。
+#
+# 関連: docs/adr/feature/FLM_FEA_0002__path_based_label.md
+#       docs/adr/engineering/FLM_ENG_0004__github_label.md
+
+name: label-path
+
+# yamllint disable-line rule:truthy
+on:
+  workflow_call:
+    inputs:
+      files:
+        description: 変更ファイル名の JSON 配列
+        required: true
+        type: string
+      pr_number:
+        description: ラベル付与対象の PR 番号
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 変更ファイル名の JSON 配列
+        required: true
+        type: string
+      pr_number:
+        description: ラベル付与対象の PR 番号
+        required: true
+        type: string
+
+jobs:
+  apply:
+    name: wf__label__path / apply
+    runs-on: ubuntu-latest
+    permissions:
+      # PR への label 付与に pull-requests: write を要する。 contents は
+      # checkout 用に read を維持する (本 workflow は repo を clone して
+      # flame CLI 経由で apply-pr-labels.sh を実行するため)。
+      contents: read
+      pull-requests: write
+    steps:
+      # actions/checkout v6.0.2
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # flame CLI を PR head の cli/scripts/install.sh で取得し、 後続 step
+      # から path-base label 付与経路を `flame ci label path-base` で起動する。
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Apply module labels
+        env:
+          FILES_JSON: ${{ inputs.files }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: flame ci label path-base

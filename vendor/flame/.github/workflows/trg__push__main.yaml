@@ -1,0 +1,28 @@
+---
+# トリガー層 ワークフロー: main ブランチへの push を契機に
+# fan-out 実体層 wf__deploy.yaml を呼び、 配布対象 (tool / library) の
+# 自動 release を並列起動する (FLM_FEA_0004)。 検査ロジックは持たない
+# (FLM_ENG_0003 §トリガー層)。
+#
+# 関連: docs/adr/feature/FLM_FEA_0004__release_policy.md
+
+name: deploy-on-main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: trg__push__main / deploy
+    uses: wakuwaku3/flame/.github/workflows/wf__deploy.yaml@main
+    permissions:
+      # release 経路は tag push と gh release create のため contents: write
+      # を、 release notes 生成の `gh api /repos/.../pulls/<N>` のため
+      # pull-requests: read を、 委譲先 reusable workflow (および その下の
+      # tool / library 実体層) へ伝搬する必要がある (FLM_FEA_0004)。
+      contents: write
+      pull-requests: read
+    with:
+      head_sha: ${{ github.sha }}

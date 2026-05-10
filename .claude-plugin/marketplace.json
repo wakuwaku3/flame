@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "flame",
+  "description": "AI 開発における品質保証 harness の Claude Code 拡張",
+  "owner": {
+    "name": "wakuwaku3"
+  },
+  "plugins": [
+    {
+      "name": "flame",
+      "description": "AI 開発における品質保証 harness の Claude Code 拡張 (agents / skills / hooks)",
+      "source": "./plugins/flame"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+---
+# 実体層 ワークフロー: fan-out (FLM_ENG_0003 §実体層同士の合成)。
+# 配布対象 2 系統 (tool / library) の release を並列起動する (FLM_FEA_0004)。
+# 系統別の実装は wf__deploy_tool.yaml / wf__deploy_lib.yaml に持つ。
+#
+# トリガー層 (FLM_ENG_0003 §トリガー層) は 「1 ファイル 1 ジョブ」 規約の
+# ため 2 系統を直接並列起動できない。 そこで本 fan-out 実体層が両系統への
+# 委譲を担い、 トリガー層からは単一 entrypoint として呼ばれる。
+#
+# 構成ジョブ (FLM_ENG_0003 §ジョブの命名 によりすべて `name:` 必須):
+#   - deploy_tool: wf__deploy_tool.yaml への委譲
+#   - deploy_lib:  wf__deploy_lib.yaml への委譲
+#
+# 関連: docs/adr/feature/FLM_FEA_0004__release_policy.md
+
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      head_sha:
+        description: release 対象の固定 commit SHA
+        required: true
+        type: string
+      dry_run:
+        description: >-
+          true で release notes 生成までに留め、 tag push と
+          gh release create を skip する (FLM_FEA_0004 §リリースノート の
+          ドライラン入口)。 production trigger からは false を渡す
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: release 対象の固定 commit SHA
+        required: true
+        type: string
+      dry_run:
+        description: >-
+          true で release notes 生成までに留め、 tag push と
+          gh release create を skip する (FLM_FEA_0004 §リリースノート の
+          ドライラン入口)
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy_tool:
+    name: wf__deploy / deploy_tool
+    uses: wakuwaku3/flame/.github/workflows/wf__deploy_tool.yaml@main
+    permissions:
+      # release 経路は tag push と gh release create のため contents: write
+      # を、 release notes 生成の `gh api /repos/.../pulls/<N>` のため
+      # pull-requests: read を、 委譲先 reusable workflow へ伝搬する必要が
+      # ある (FLM_FEA_0004)。
+      contents: write
+      pull-requests: read
+    with:
+      head_sha: ${{ inputs.head_sha }}
+      dry_run: ${{ inputs.dry_run }}
+
+  deploy_lib:
+    name: wf__deploy / deploy_lib
+    uses: wakuwaku3/flame/.github/workflows/wf__deploy_lib.yaml@main
+    permissions:
+      contents: write
+      pull-requests: read
+    with:
+      head_sha: ${{ inputs.head_sha }}
+      dry_run: ${{ inputs.dry_run }}

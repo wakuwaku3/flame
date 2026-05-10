@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "golang.go",
+    "GitHub.vscode-pull-request-github",
+    "github.vscode-github-actions",
+    "mkhl.direnv"
+  ]
+}

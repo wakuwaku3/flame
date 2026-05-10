@@ -1,0 +1,218 @@
+---
+# 実体層 ワークフロー: 配布対象 (`_tool` suffix 付き main package)
+# アプリケーションを enumerate し、 アプリごとに前回 release との
+# 公開 surface 差分から次バージョンを決め、 cross-compile artifacts と
+# CLI spec を release asset として添付する (FLM_FEA_0004)。
+#
+# 構成ジョブ (FLM_ENG_0003 §ジョブの命名 によりすべて `name:` 必須):
+#   - enumerate: 配布対象 main package を enumerate し matrix を作る
+#   - release:   matrix で per-app に次バージョン算出 → build → tag/release
+#   - noop:      配布対象 0 件のときの固定 success ジョブ
+#   - summary:   各 job 結果を集約
+#
+# 第三者 actions は immutable な commit SHA に pin する (mutable tag 経由で
+# upstream を侵されたときに任意コードが走る)。tag 表記はコメントとして残す。
+#
+# 関連: docs/adr/feature/FLM_FEA_0004__release_policy.md
+
+name: deploy
+
+# yamllint disable-line rule:truthy
+on:
+  workflow_call:
+    inputs:
+      head_sha:
+        description: release 対象の固定 commit SHA
+        required: true
+        type: string
+      dry_run:
+        description: >-
+          true で release notes 生成までに留め、 tag push と
+          gh release create を skip する (FLM_FEA_0004 §リリースノート の
+          ドライラン入口)。 production trigger からは false を渡す
+        required: false
+        type: boolean
+        default: false
+      prior_tag_override:
+        description: >-
+          dry_run 検証で前回 release tag を強制指定するための override。
+          例 `flame/v1.0.2`。 空文字なら通常の前回 release 参照経路で動作
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: release 対象の固定 commit SHA
+        required: true
+        type: string
+      dry_run:
+        description: >-
+          true で release notes 生成までに留め、 tag push と
+          gh release create を skip する (FLM_FEA_0004 §リリースノート の
+          ドライラン入口)
+        required: false
+        type: boolean
+        default: false
+      prior_tag_override:
+        description: >-
+          dry_run 検証で前回 release tag を強制指定するための override。
+          例 `flame/v1.0.2`。 空文字なら通常の前回 release 参照経路で動作
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  enumerate:
+    name: wf__deploy_tool / enumerate
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.enum.outputs.matrix }}
+      has_apps: ${{ steps.enum.outputs.has_apps }}
+    steps:
+      # actions/checkout v6.0.2
+      - name: Checkout target commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ inputs.head_sha }}
+      # flame CLI を head の cli/scripts/install.sh で取得し、 後続 step
+      # から enumerate 経路を `flame ci deploy detect` で起動する。
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Enumerate distributable apps
+        id: enum
+        run: flame ci deploy detect "$GITHUB_OUTPUT"
+
+  release:
+    name: wf__deploy_tool / release (${{ matrix.apps.app_name }})
+    needs: enumerate
+    if: needs.enumerate.outputs.has_apps == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      # tag push と gh release create のため contents: write を要求する。
+      # release notes 生成 (FLM_FEA_0004 §リリースノート) で `gh api
+      # /repos/.../pulls/<N>` を叩くため pull-requests: read も要求する
+      # (default では付与されないため明示)。
+      contents: write
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.enumerate.outputs.matrix) }}
+    steps:
+      # actions/checkout v6.0.2
+      - name: Checkout target commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ inputs.head_sha }}
+      # jetify-com/devbox-install-action v0.15.0。 当 action 内部の
+      # verification step (`devbox run -- echo`) でも devbox.json の init_hook
+      # (vendor/flame/devbox/init.sh) が走り gh api を起動するため、
+      # GH_TOKEN を env として渡す。
+      - name: Install devbox
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # yamllint disable-line rule:line-length
+        uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7
+      # private な Go module fetch (cli が依存する `github.com/wakuwaku3/flame/lib`
+      # 等) のため、 actions/checkout の repo-local 認証では届かない gopath 配下の
+      # git clone に届く global の credential を入れる。 GOPRIVATE は devbox.json
+      # の env で指定済み。
+      # flame CLI を head の cli/scripts/install.sh で取得し、 後続 step
+      # から configure-go-auth / release 経路を flame CLI で起動する。
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Configure git auth for private Go module fetch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: flame ci configure-go-auth
+      - name: Release ${{ matrix.apps.app_name }}
+        env:
+          MODULE: ${{ matrix.apps.module }}
+          APP_DIR: ${{ matrix.apps.app_dir }}
+          APP_NAME: ${{ matrix.apps.app_name }}
+          COMMIT_SHA: ${{ inputs.head_sha }}
+          ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          PRIOR_TAG_OVERRIDE: ${{ inputs.prior_tag_override }}
+        run: >-
+          flame ci release tool
+          "$MODULE" "$APP_DIR" "$APP_NAME" "$COMMIT_SHA"
+
+  noop:
+    name: wf__deploy_tool / noop
+    needs: enumerate
+    if: needs.enumerate.outputs.has_apps == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v6.0.2 — head 由来の cli/scripts/install.sh を取得する。
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: No distributable apps
+        run: flame ci noop 'no apps with _tool suffix; skipping release'
+
+  summary:
+    name: wf__deploy_tool / summary
+    needs: [enumerate, release, noop]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v6.0.2
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # flame CLI を PR head の cli/scripts/install.sh で取得し、 後続 step
+      # から release matrix 結果集約経路を `flame ci deploy summary` で起動する。
+      # actions/checkout v6.0.2 — flame CLI installer を別 path で取得 (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
+      - name: Install flame CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .flame-tool/cli/scripts/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Roll up enumerate / release / noop results
+        env:
+          ENUMERATE_RESULT: ${{ needs.enumerate.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+          NOOP_RESULT: ${{ needs.noop.result }}
+        run: flame ci deploy summary

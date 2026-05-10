@@ -1,0 +1,12 @@
+tmp
+.devbox
+.direnv
+.local
+.claude/.cache/
+.claude/scheduled_tasks.lock
+
+# flame harness は vendor/flame/ 配下を SoT として追跡する (FLM_FEA_0003)。
+# 親 dir 全体を ignore すると Git が下に降りないため、 *  で直接子のみを
+# ignore してから !vendor/flame で flame だけ unignore する。
+vendor/*
+!vendor/flame

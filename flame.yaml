@@ -1,0 +1,26 @@
+---
+# flame harness manifest (FLM_FEA_0003)
+flame:
+  harness:
+    source: github.com/wakuwaku3/flame
+    # source 提供元 repo (= 当該 repo 自身が source 元) のため、 install 元 vendor の
+    # 内容を「現在の作業ツリーのソースコード」 と同期する特別マーカー値 `self` を
+    # 指定する。 利用側 repo では vX.Y.Z 形式の release tag を指定する。
+    version: self
+    ignore:
+      # 本リポジトリは flame harness の source 提供元のため vendor/flame/ を
+      # commit する (本来 install 先 repo は vendor/flame/ を .gitignore 登録
+      # するべきだが、 source 提供元では適用しないことを示すマーカー)。
+      - .gitignore
+      # 本リポジトリは flame plugin の source 提供元 (= .claude-plugin/ が SoT)
+      # のため、 利用側 repo に対する `/plugin marketplace add wakuwaku3/flame`
+      # + `/plugin install flame@flame` 経由の plugin install 工程は適用しない
+      # (代わりに .claude/settings.json の extraKnownMarketplaces で当該 repo
+      # 自身を local marketplace 登録する形を採用する) ことを示すマーカー。
+      - .claude/plugins
+  ai:
+    pre_push:
+      # `flame ai hook pre-push` の段階 1 並列レビューに repo-local な
+      # 追加 reviewer agent を組み込む (.claude/agents/<name>.md を SoT)。
+      stage1_extra_agents:
+        - flame-classification-reviewer

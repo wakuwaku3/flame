@@ -1,0 +1,7 @@
+{
+  "name": "flame",
+  "version": "1.2.14",
+  "description": "AI 開発における品質保証 harness の Claude Code 拡張 (agents / skills / hooks)",
+  "homepage": "https://github.com/wakuwaku3/flame",
+  "repository": "https://github.com/wakuwaku3/flame"
+}

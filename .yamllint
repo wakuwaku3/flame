@@ -1,0 +1,5 @@
+---
+# repo root yamllint config stub
+# vendor SoT 側 (vendor/flame/.yamllint) を継承する。 repo 独自の拡張ルールを後ろに追加可能
+# ([FLM_GEN_0007] §repo root における downstream resource の取り込み形式)。
+extends: vendor/flame/.yamllint

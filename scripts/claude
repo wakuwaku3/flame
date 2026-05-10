@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# `.envrc` の `PATH_add scripts` で本ファイルが本物の `claude` より先に解決されるため、
+# 自己再帰回避のために PATH から自分の dir を除いた状態で real claude を引き直す。
+set -euo pipefail
+
+self="$(readlink -f -- "${BASH_SOURCE[0]}")"
+self_dir="$(dirname -- "$self")"
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+plugin_dir=""
+if [[ -n "$repo_root" && -f "${repo_root}/plugins/flame/.claude-plugin/plugin.json" ]]; then
+  plugin_dir="${repo_root}/plugins/flame"
+fi
+
+IFS=':' read -ra entries <<<"$PATH"
+filtered=()
+for entry in "${entries[@]}"; do
+  [[ "$entry" == "$self_dir" ]] && continue
+  filtered+=("$entry")
+done
+filtered_path=$(IFS=:; printf '%s' "${filtered[*]}")
+real_claude="$(PATH="$filtered_path" command -v claude || true)"
+
+if [[ -z "$real_claude" ]]; then
+  echo "scripts/claude: real 'claude' not found on PATH (excluding ${self_dir})" >&2
+  exit 127
+fi
+
+if [[ -n "$plugin_dir" ]]; then
+  exec "$real_claude" --plugin-dir "$plugin_dir" "$@"
+fi
+exec "$real_claude" "$@"
