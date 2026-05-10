@@ -185,16 +185,23 @@ func readOverlay(_ context.Context, repoRoot, installPath string) (content []byt
 	return data, filepath.ToSlash(overlayRel), nil
 }
 
-// overlayPathFor は install path から副ファイル overlay の path を導く。 拡張子のあるファイルは `<basename-without-ext>.flame-overlay.<ext>`、 無いファイルは `<basename>.flame-overlay`。
+// overlayPathFor は install path から副ファイル overlay の path を導く。 拡張子のあるファイルは `<basename-without-ext>.flame-overlay.<ext>`、 無いファイルは `<basename>.flame-overlay` (FLM_FEA_0003 §副ファイル overlay 機構)。 hidden file (= `.shellcheckrc` 等の dot 始まりかつ単一 dot) は no-ext 扱い (Go の `filepath.Ext` は hidden file の filename 全体を ext として返す挙動のため、 ここで個別判定する)。
 func overlayPathFor(installPath string) string {
 	dir := filepath.Dir(installPath)
 	base := filepath.Base(installPath)
-	ext := filepath.Ext(base)
+	ext := overlayExt(base)
 	if ext == "" {
 		return filepath.Join(dir, base+".flame-overlay")
 	}
 	stem := strings.TrimSuffix(base, ext)
 	return filepath.Join(dir, stem+".flame-overlay"+ext)
+}
+
+func overlayExt(base string) string {
+	if strings.HasPrefix(base, ".") && strings.Count(base, ".") == 1 {
+		return ""
+	}
+	return filepath.Ext(base)
 }
 
 func writeWritable(_ context.Context, path string, content []byte) error {

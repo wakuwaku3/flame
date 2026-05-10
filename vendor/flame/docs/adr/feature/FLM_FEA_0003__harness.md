@@ -154,7 +154,7 @@ vendor の SoT 構造、 install path との 1:1 マッピング、 副ファイ
 
 #### install 先の read-only 強制
 
-`flame install` は install copy 経路で配置したファイル (= `flame.lock.files[].install`) と `flame-` prefix で識別される install copy 群 (`flame-` prefix の rule stub `.claude/rules/flame-*.md` および workflow scaffold `.github/workflows/flame-*.yaml`) を **install 直後に `chmod 444` (read-only)** で確定させる。 これにより利用側が install 先を直接編集する経路を OS 層で塞ぎ、 vendor SoT への合流を強制する。 利用側拡張は副ファイル overlay (`*.flame-overlay.*`) 経由でのみ行う。
+`flame install` は install copy 経路で配置したファイル (= `flame.files[].install`) と `flame-` prefix で識別される install copy 群 (`flame-` prefix の rule stub `.claude/rules/flame-*.md` および workflow scaffold `.github/workflows/flame-*.yaml`) を **install 直後に `chmod 444` (read-only)** で確定させる。 これにより利用側が install 先を直接編集する経路を OS 層で塞ぎ、 vendor SoT への合流を強制する。 利用側拡張は副ファイル overlay (`*.flame-overlay.*`) 経由でのみ行う。
 
 git は file mode を 100644 / 100755 の 2 値しか追跡しないため、 `chmod 444` は clone 後に消える。 `flame install` の冪等再実行で再付与される運用とする。
 
@@ -164,7 +164,7 @@ git は file mode を 100644 / 100755 の 2 値しか追跡しないため、 `c
 
 #### 動的マージ対象ファイル
 
-vendor チャネルの install copy ファイル全件 (`flame.lock.files[]`) を **動的マージ対象** として扱い、 `flame.lock.files[].merge` を必須 field として明示記録する (= `deep` / `append` / `replace` のいずれか)。 拡張子からの推論には依存せず lockfile 単体で合成方式を確定可能とすることで、 lockfile を読む CLI / 人間 / レビュアーが追加情報なしで挙動を把握できるようにする。
+vendor チャネルの install copy ファイル全件 (`flame.files[]`) を **動的マージ対象** として扱い、 `flame.files[].merge` を必須 field として明示記録する (= `deep` / `append` / `replace` のいずれか)。 拡張子からの推論には依存せず lockfile 単体で合成方式を確定可能とすることで、 lockfile を読む CLI / 人間 / レビュアーが追加情報なしで挙動を把握できるようにする。
 
 - `.golangci.yaml` / `.yamllint` 系 / JSON 系 → `merge: deep` (構造化 3-way merge)
 - `.shellcheckrc` / `.envrc` 等の拡張子なしテキスト → `merge: append` (line-based 3-way merge)
@@ -215,7 +215,7 @@ flame self / 利用側ともに同じ install 規約 (= 全 repo で `flame-trg_
 
 | 入力 | 由来 |
 | --- | --- |
-| base | 前回 install 時の vendor file (`flame.lock.files[].vendor_content` の snapshot) |
+| base | 前回 install 時の vendor file (`flame.files[].vendor_content` の snapshot) |
 | their | 現在の vendor file |
 | our | 現在の overlay 副ファイル |
 
@@ -421,8 +421,8 @@ self mode (= vendor が working tree) は対象外。 `flame.ignore` に `vendor
 
 検査対象:
 
-1. **再合成整合**: 現状の vendor (および overlay) を `merge` strategy で再合成した結果 == `flame.lock.files[].content`
-2. **install 側整合**: install 先ファイル == `flame.lock.files[].content`
+1. **再合成整合**: 現状の vendor (および overlay) を `merge` strategy で再合成した結果 == `flame.files[].content`
+2. **install 側整合**: install 先ファイル == `flame.files[].content`
 3. **vendor 孤児検出**: `vendor/flame/` 配下に `flame.files[].vendor` で参照されていないファイルが存在しないか (取り込み形式 = `flame.embeds[].target` で参照されるものは除外)
 4. **参照実在性**: `flame.files[].vendor` / `overlay.path` / `install`、 および `flame.embeds[].target` / `install` で指すパスが実在するか
 5. **embeds snippet 実在性**: `flame.embeds[].install` で指す install 先 file 内に `flame.embeds[].snippet` が出現するか
@@ -515,7 +515,7 @@ source 提供元 repo (= flame self) は `vendor/flame/` を working tree (SoT) 
 - `flame.yaml` の schema を `flame.harness.{source, version, ignore, ai}` から `flame.{source, version, ignore, ai}` に flatten した。 `flame.lock` も `flame.harness.{files, embeds}` から `flame.{installed, files, embeds}` に flatten。 中間段の `harness` ネスト撤廃により、 manifest / lock の field アクセス経路が 1 段浅くなり、 利用者が手書きする `flame.yaml` の縦の階層深さも縮む
 - `flame.lock.installed.{source, version, tree_hash}` セクションを追加した。 `flame install` 起動時に CLI が前回の `installed.{source, version}` と現在の manifest を比較し、 不一致 (= version bump / source 切り替え) を検知した場合に既存 vendor を削除して再 fetch する。 これにより `flame.yaml` の version を bump するだけで vendor が自動的に新 version に追従し、 利用者が手動で `vendor/flame/` を削除する経路が不要になる
 - `flame.lock.installed.tree_hash` は vendor/flame 配下の content hash (= 各 file の sha256 を path 順で連結し全体を sha256 した値、 `sha256:<hex>` 形式) で、 self mode (= `flame.version == "self"`) では記録しない (working tree が常時変動するため CI 検査が安定しないため)
-- `flame.lock.files[].vendor_content` / `flame.lock.files[].overlay.content` snapshot field を追加した。 3-way merge の base = 前回 vendor、 their = 現在の vendor、 our = 現在の overlay、 という入力 3 者を CLI が lockfile から復元できるようにする
+- `flame.files[].vendor_content` / `flame.files[].overlay.content` snapshot field を追加した。 3-way merge の base = 前回 vendor、 their = 現在の vendor、 our = 現在の overlay、 という入力 3 者を CLI が lockfile から復元できるようにする
 - `flame.ignore` directive を機能単位 (機能 ID) に変更した。 利用側は工程 / resource type / tool 単位で flame の挙動を細かく制御できる (例: 利用側で `golangci-lint` を採用しない場合は `ignore: [golangci-lint]` で `.golangci.yaml` の install を skip)。 source 提供元 repo (= flame self) の特例 (旧来の暗黙的 self mode 検査) は廃止し、 self mode に必要な skip も `ignore: [vendor-sync, vendor-readonly, gitignore, claude/plugins]` 等で明示宣言する
 - 旧 ignore 値 `.gitignore` / `.claude/plugins` (= リテラルなパス文字列) は撤廃し、 新命名 `gitignore` / `claude/plugins` (= 機能 ID) に置き換えた。 既存利用側 repo の `flame.yaml` は manifest 側の rename が必要
 - `flame install` の `flame.yaml` 探索は cwd 固定 (上方向 walk-up を撤廃) とした。 npm の `package.json` 探索と同じ慣習で、 利用者が「どの repo に対して install しているか」 を cwd の場所で曖昧さなく判別できる。 cwd 直下に `flame.yaml` が無い場合は即時 error: "flame.yaml not found in current directory"
@@ -567,7 +567,7 @@ source 提供元 repo (= flame self) は `vendor/flame/` を working tree (SoT) 
 - **機械可読 schema を持たず ADR 内の YAML 例のみで運用する**: ADR を SoT として運用するシンプルさはあるが、 IDE 補完・即時 lint を受けられず、 `flame.yaml` を編集する開発者は ADR を都度開いてフィールド名・型を照合する必要がある。 ADR を SoT に保ったまま機械可読版 (JSON Schema) を併設し、 IDE が同 schema を解釈する経路を採用した
 - **機械可読 schema として CUE / Cue lang を採用する**: より強力な制約 (型 + 値 domain + 関係制約) を表現できる利点があるが、 IDE 側の対応が JSON Schema に比べて狭く `yaml-language-server` / Red Hat YAML 拡張等の標準 IDE エコシステムから外れる。 IDE 補完を主目的とする本用途では JSON Schema (Draft 2020-12) を採用した
 - **JSON Schema を `vendor/flame/` 直下に置く**: `vendor/flame/<filename>` 形式で flat に並べる案もあるが、 vendor 内には既に `CLAUDE.md` / `.envrc` / lint 設定 / `devbox.json` 等の install 対象が並んでおり、 install 経路を取らない meta-resource (schema) を識別しにくい。 `vendor/flame/schemas/` ディレクトリを切り、 install 対象 / 非対象を物理レイアウトで区別する形を採用した
-- **JSON Schema を install 経路に乗せて利用側 repo root に配置する**: `vendor/flame/` 配下に依存しない参照経路 (例: repo root 直下 `flame.yaml.schema.yaml`) を作る案。 install 経路で配置する場合は `flame.lock.files[]` の管理対象になり、 schema 改訂時に整合性検査の drift が発生する。 schema は `flame.yaml` 編集時の参照対象であり利用側拡張対象ではないため、 install 経路を持たず vendor SoT を直接参照する形 (= `tests/shared/` と同じ運用) を採用した
+- **JSON Schema を install 経路に乗せて利用側 repo root に配置する**: `vendor/flame/` 配下に依存しない参照経路 (例: repo root 直下 `flame.yaml.schema.yaml`) を作る案。 install 経路で配置する場合は `flame.files[]` の管理対象になり、 schema 改訂時に整合性検査の drift が発生する。 schema は `flame.yaml` 編集時の参照対象であり利用側拡張対象ではないため、 install 経路を持たず vendor SoT を直接参照する形 (= `tests/shared/` と同じ運用) を採用した
 - **機械可読 schema を JSON シリアライズ形式 (`.json`) で記述する**: schemastore.org 等のエコシステム慣習と合致するが、 flame は YAML 設定を主軸に据えており ([FLM_APP_0004](../application/FLM_APP_0004__yaml.md))、 schema も YAML で記述する方が自プロジェクトの SoT 言語と整合する。 yaml-language-server / Red Hat YAML 拡張は YAML シリアライズの JSON Schema を解釈できるため IDE 補完・即時 lint の機能差は無い。 YAML 化により schema 内に説明コメント (`#`) を書ける副次効果もある
 - **`flame.ai.*` を持たず repo 固有拡張は別ファイル (例 `flame-extras.yaml`) に分離する**: manifest を「不変情報のみ」 に保てる利点があるが、 `flame ai hook pre-push` 等の hook 実装側で読むファイルが増え、 利用側は 2 ファイル管理になる。 `flame.yaml` を「flame harness が参照する repo 固有設定の単一 manifest」 と再定義し、 hook 拡張領域も同ファイルに同居させる方を採用した
 - **`flame.ai.*` の schema を ADR で規定せず schema ファイル側だけで定義する**: 機械可読 schema が独自にフィールドを増やせる柔軟性はあるが、 ADR を SoT とする §schema の機械可読化 と矛盾する。 ADR で `flame.ai.*` を formal に規定し、 schema ファイルは ADR 規定の機械可読版に留める形を採用した

@@ -54,8 +54,8 @@ func merge3WayText(in *Merge3WayInput) (*Merge3WayOutput, error) {
 	if in.OurContent == nil {
 		return &Merge3WayOutput{Content: in.TheirContent, Conflicts: nil}, nil
 	}
-	if in.BaseContent == nil {
-		// 初回 install with overlay: overlay を完成形として採用
+	if len(in.BaseContent) == 0 {
+		// 初回 install with overlay: overlay を完成形として採用 (base が記録されていない場合も同様)
 		return &Merge3WayOutput{Content: in.OurContent, Conflicts: nil}, nil
 	}
 	merged, conflicts := mergeLines3Way(in.BaseContent, in.TheirContent, in.OurContent)
@@ -66,7 +66,7 @@ func merge3WayStructured(in *Merge3WayInput) (*Merge3WayOutput, error) {
 	if in.OurContent == nil {
 		return &Merge3WayOutput{Content: in.TheirContent, Conflicts: nil}, nil
 	}
-	if in.BaseContent == nil {
+	if len(in.BaseContent) == 0 {
 		return &Merge3WayOutput{Content: in.OurContent, Conflicts: nil}, nil
 	}
 	ext := strings.ToLower(filepath.Ext(in.InstallPath))

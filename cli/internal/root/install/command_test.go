@@ -122,6 +122,50 @@ func TestRun(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "flame.yaml")
 	})
+
+	t.Run("overlay 経由で利用者拡張が install 結果に反映される (vendor unchanged)", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		writeFixtureRepo(t, root, "self")
+		writeFlameYAML(t, root, "self", []string{"gitignore", "claude/plugins", "vendor-sync", "vendor-readonly"})
+		// overlay = 「最終形」 で .shellcheckrc を書く (vendor base + 利用者拡張)
+		mustWrite(t, filepath.Join(root, ".shellcheckrc.flame-overlay"), "disable=SC2016\ndisable=SC2086\n")
+		require.NoError(t, install.Run(context.Background(), root, os.Stdout, os.Stderr))
+		// 1 回目は base が無く overlay = 最終形採用
+		got := mustRead(t, filepath.Join(root, ".shellcheckrc"))
+		assert.Equal(t, "disable=SC2016\ndisable=SC2086\n", string(got))
+	})
+
+	t.Run("ignore directive で個別 feature の install copy が skip される", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		writeFixtureRepo(t, root, "self")
+		writeFlameYAML(t, root, "self", []string{"gitignore", "claude/plugins", "vendor-sync", "vendor-readonly", "shellcheck"})
+		require.NoError(t, install.Run(context.Background(), root, os.Stdout, os.Stderr))
+		// shellcheck feature 全体が skip → .shellcheckrc は install されない
+		_, err := os.Stat(filepath.Join(root, ".shellcheckrc"))
+		assert.True(t, os.IsNotExist(err), ".shellcheckrc should be skipped: %v", err)
+		// 一方 .golangci.yaml は引き続き install される
+		_, err = os.Stat(filepath.Join(root, ".golangci.yaml"))
+		require.NoError(t, err)
+	})
+
+	t.Run("3-way merge で vendor 削除 + overlay kept が conflict として install を中断する", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		writeFixtureRepo(t, root, "self")
+		writeFlameYAML(t, root, "self", []string{"gitignore", "claude/plugins", "vendor-sync", "vendor-readonly"})
+		// 初回 install: lock に base (= 現状の vendor) が記録される
+		require.NoError(t, install.Run(context.Background(), root, os.Stdout, os.Stderr))
+		// vendor から要素を削除 (= flame side が線を消した)
+		mustWrite(t, filepath.Join(root, "vendor", "flame", ".shellcheckrc"), "")
+		// overlay で消された行を kept
+		mustWrite(t, filepath.Join(root, ".shellcheckrc.flame-overlay"), "disable=SC2016\n")
+
+		err := install.Run(context.Background(), root, os.Stdout, os.Stderr)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "conflict")
+	})
 }
 
 // writeFixtureRepo は test 用に最小 repo 構造を組み立てる。 vendor/flame/ 配下に install 対象 file を配置し、 flame.yaml を repo root に置く。

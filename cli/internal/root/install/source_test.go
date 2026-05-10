@@ -92,6 +92,56 @@ func TestMakeVendorWritable(t *testing.T) {
 	})
 }
 
+func TestNormalizeGitURL(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "https はそのまま", in: "https://github.com/wakuwaku3/flame", want: "https://github.com/wakuwaku3/flame"},
+		{name: "git@ はそのまま (SSH)", in: "git@github.com:wakuwaku3/flame.git", want: "git@github.com:wakuwaku3/flame.git"},
+		{name: "github.com/owner/repo は https:// prefix を補完", in: "github.com/wakuwaku3/flame", want: "https://github.com/wakuwaku3/flame"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, normalizeGitURL(tc.in))
+		})
+	}
+}
+
+func TestCopyTree(t *testing.T) {
+	t.Parallel()
+
+	t.Run("file 内容と dir 構造が保存される", func(t *testing.T) {
+		t.Parallel()
+		src := t.TempDir()
+		dst := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(src, "sub"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "a.txt"), []byte("alpha"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "sub", "b.txt"), []byte("bravo"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "exec.sh"), []byte("#!/bin/sh\n"), 0o755))
+
+		require.NoError(t, copyTree(context.Background(), src, dst))
+
+		assertPerm(t, filepath.Join(dst, "a.txt"), 0o644)
+		assert.Equal(t, "alpha", string(mustReadFile(t, filepath.Join(dst, "a.txt"))))
+		assert.Equal(t, "bravo", string(mustReadFile(t, filepath.Join(dst, "sub", "b.txt"))))
+		// exec ビットが保持される
+		info, err := os.Stat(filepath.Join(dst, "exec.sh"))
+		require.NoError(t, err)
+		assert.NotZero(t, info.Mode().Perm()&0o111)
+	})
+}
+
+func mustReadFile(tb testing.TB, path string) []byte {
+	tb.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(tb, err)
+	return data
+}
+
 func buildVendorTree(tb testing.TB) string {
 	tb.Helper()
 	root := tb.TempDir()
