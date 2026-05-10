@@ -13,6 +13,12 @@
 #   - noop:    has_work=false 時の固定 success ジョブ (flame ci noop)
 #   - label:   wf__label.yaml への workflow_call で PR に module label 付与
 #              (PR 由来でない workflow_dispatch / fork PR は skip)
+#   - install_drift: PR head から flame CLI を build し `flame install` を
+#              起動 → `git diff --exit-code` で vendor / install copy / lock の
+#              整合性を検査する (FLM_FEA_0003 §integrity check の install 経路)。
+#              flame self の場合 vendor SoT と install 先がズレないことを
+#              保証する gate。 利用側 repo でも CLI 改訂が drift を生まないこと
+#              を CI 段で検出する。
 #   - summary: 上記の result を集約し branch protection 用の固定名 status
 #              として顕在化させる (= `check / summary`)
 #
@@ -222,9 +228,60 @@ jobs:
       files: ${{ needs.diff.outputs.files }}
       pr_number: ${{ inputs.pr_number }}
 
+  install_drift:
+    name: wf__check / install_drift
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v6.0.2 — head_sha (= refs/pull/<n>/head 相当の固定 SHA)
+      # を作業ディレクトリへ最小 clone する。 flame self repo では本 step で
+      # 取得した tree が SoT そのもの (vendor/flame/ を含む) のため、
+      # `flame install` の self mode 経路を駆動できる。
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ inputs.head_sha }}
+      # PR head に同梱された Go toolchain で flame CLI を build する経路の
+      # 前段 (flame CLI 自体を変更する PR で head 反映を保証するため)。
+      - name: Install devbox
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # yamllint disable-line rule:line-length
+        uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7
+      - name: Configure git auth (bootstrap for private Go module fetch)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git config --global "url.https://x-access-token:${GH_TOKEN}@github.com/.insteadOf" "https://github.com/"
+      # PR head に flame CLI ソース (cli/cmd/flame_tool/) が存在する flame self
+      # 経路では head の `go build` で binary を生成する (= PR 内容を検査側に
+      # 反映)。 利用側 repo (= cli/cmd/flame_tool/ 不在) では release 済 binary
+      # で代替するため install_drift の検査対象が「published flame」 になり、
+      # PR head の install 実装変更は反映されない (= 利用側 repo の install
+      # drift gate は published flame の挙動のみを観測する)。
+      - name: Build flame CLI from PR head
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # yamllint disable-line rule:line-length
+        run: |
+          if [[ -d cli/cmd/flame_tool ]]; then devbox run -- sh -c 'cd cli && go build -o ~/.local/bin/flame ./cmd/flame_tool'; else bash .flame-tool/cli/scripts/install.sh; fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Configure git auth for private Go module fetch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: flame ci configure-go-auth
+      # `flame install` を実行し、 vendor SoT と install 先の合成結果が
+      # `flame.lock` および install path の現状と完全一致することを `git diff
+      # --exit-code` で確認する。 idempotent でない (= drift を生む) 場合は
+      # exit 1 となり PR が block される。
+      - name: Run flame install
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: devbox run -- flame install
+      - name: Verify no drift after flame install
+        run: git diff --exit-code
+
   summary:
     name: wf__check / summary
-    needs: [diff, check, noop, label]
+    needs: [diff, check, noop, label, install_drift]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -246,10 +303,11 @@ jobs:
         run: |
           bash .flame-tool/cli/scripts/install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Roll up diff / check / noop / label results
+      - name: Roll up diff / check / noop / label / install_drift results
         env:
           BUCKET_RESULT: ${{ needs.diff.result }}
           CHECK_RESULT: ${{ needs.check.result }}
           NOOP_RESULT: ${{ needs.noop.result }}
           LABEL_RESULT: ${{ needs.label.result }}
+          INSTALL_DRIFT_RESULT: ${{ needs.install_drift.result }}
         run: flame ci check summary
