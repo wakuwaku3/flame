@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # devbox shell init_hook の本体 (FLM_FEA_0003)。
-# flame は private repo のため curl 直 fetch ができず、 認証済 gh で
-# Contents API 経由に取得する。 取得元の `<owner>/<repo>` は利用側 repo の
-# `flame.yaml.harness.source` (= `github.com/<owner>/<repo>` 形式) から
-# 動的に解決する。 vendor SoT に固定 owner/repo を埋め込まないことで、
-# fork / mirror 配信先からも本 init_hook が機能する。
+# flame self は public 配信 (FLI_FEA_0001) のため install スクリプトを raw URL から
+# anonymous fetch して bash に流す。 取得元の `<owner>/<repo>` は利用側 repo の
+# `flame.yaml.harness.source` (= `github.com/<owner>/<repo>` 形式) から動的に解決する
+# ことで fork / mirror 配信先からも本 init_hook が機能する。
 
 set -euo pipefail
 
@@ -14,18 +13,6 @@ set -euo pipefail
 # 走らせると PR head から build した flame バイナリを release 版で上書きしてしまう
 # ため、 既に flame が PATH 上にある場合は skip する (idempotent 化)。
 if command -v flame >/dev/null 2>&1; then
-  exit 0
-fi
-
-# devbox は subshell を立てるとき env の一部を filter するため、 親 shell で
-# `gh auth login` 済みでも `gh auth status` で見えないことがある。 同様に CI で
-# `GH_TOKEN` env を渡しても devbox subshell 越しでは欠落する場合がある。 init_hook
-# は「gh が利用可能なら flame CLI を idempotent install する」 best-effort 経路と
-# して扱い、 認証が解決できない環境では skip する (= CI / 利用側 repo の install
-# 経路は別途 GitHub Release asset 経由 (FLI_FEA_0001) で flame CLI を配置するため、
-# init_hook で install できなくても全体は破綻しない)。
-if ! gh auth status >/dev/null 2>&1; then
-  echo "vendor/flame/devbox/init.sh: gh authentication unavailable in current shell; skipping flame CLI install (will be handled by separate install step)" >&2
   exit 0
 fi
 
@@ -41,7 +28,6 @@ case "$source_line" in
     ;;
 esac
 
-gh api \
-  -H 'Accept: application/vnd.github.raw' \
-  "/repos/${owner_repo}/contents/cli/scripts/install.sh" \
+curl -fsSL \
+  "https://raw.githubusercontent.com/${owner_repo}/HEAD/cli/scripts/install.sh" \
   | bash
