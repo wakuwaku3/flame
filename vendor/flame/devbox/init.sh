@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # devbox shell init_hook の本体 (FLM_FEA_0003)。
-# flame self は public 配信 (FLI_FEA_0001) のため install スクリプトを raw URL から
-# anonymous fetch して bash に流す。 取得元の `<owner>/<repo>` は利用側 repo の
+# 取得元 repo を public 配信前提で扱い、 install スクリプトを raw URL から anonymous
+# fetch して bash に流す。 取得元の `<owner>/<repo>` は利用側 repo の
 # `flame.yaml.harness.source` (= `github.com/<owner>/<repo>` 形式) から動的に解決する
 # ことで fork / mirror 配信先からも本 init_hook が機能する。
 
