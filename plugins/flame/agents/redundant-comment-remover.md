@@ -51,7 +51,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 
 ## 削除対象
 
-### ソースコード (`*.go` / `*.sh`) の場合
+### ソースコード で削除する対象
 
 [FLM_APP_0010](../../../vendor/flame/docs/adr/application/FLM_APP_0010__code_comment.md) §書かない対象 / §原則 に該当するコメントを削除:
 
@@ -61,7 +61,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 - 行先のない TODO / FIXME (担当・期限・条件のいずれも紐付かないもの)
 - コード本体およびシンボル名から読み取れる How (どう動くか / 何をしているか) を述べるだけのコメント
 
-### lint config の場合
+### lint config で削除する対象
 
 [FLM_GEN_0006](../../../vendor/flame/docs/adr/general/FLM_GEN_0006__no_lint_suppression.md) §lint config ファイルにはコメントを書かない に従い **全コメントを削除** する。 lint config はコメントを持たず機械可読な設定値のみで構成すべきという規約。 グローバル無効化の理由は当該無効化を要請する ADR §影響 に書かれているため、 lint config 側に重複させる意義が無い。
 
@@ -74,7 +74,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 
 ## 残す対象
 
-### ソースコード (`*.go` / `*.sh`) の場合
+### ソースコード で残す対象
 
 [FLM_APP_0010](../../../vendor/flame/docs/adr/application/FLM_APP_0010__code_comment.md) §書く対象 に該当するコメントは残す。 削除対象との判別が拮抗する場合は残す方を default にする。 「冗長コメントが残るリスク」 と「Why コメントを誤削除するリスク」 では後者の方が回復コスト (元の判断根拠を再構築する手間) が高いため、 境界事例は保守的に倒す。
 
@@ -85,7 +85,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 - 並行性・性能・互換性などの非機能要件由来の選択
 - package doc (package 全体の役割・公開 API 全体の使い方を集約したもの)
 
-### lint config の場合
+### lint config で残す対象
 
 機能を伴うコメント (= lint tool 自身が解釈する指示コメント) は残す。 [FLM_GEN_0006](../../../vendor/flame/docs/adr/general/FLM_GEN_0006__no_lint_suppression.md) §決定 §局所抑制が真に避けられない場合のみ で許容される指示コメント群:
 
