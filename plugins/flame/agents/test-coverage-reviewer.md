@@ -43,6 +43,26 @@ tools: Read, Bash, Grep, Glob
 
 違反・不足がなければ `No findings.` とだけ返す。
 
+## 指摘しない対象 (merge ブロッカー基準)
+
+以下に該当する findings は **出力しない**。 これらは PR を merge する判断を変えない雑音であり、 修正サイクルを累積させて merge 到達を阻害する。
+
+- test 関数名 / case 名の言い回し・命名の好み
+- test の構造・分割粒度の好み (table-driven / sub test / helper 抽出 等のスタイル提案)
+- 既にカバー済みの観点に対する追加 case 提案 (= 同等観点の重複追加)
+- 「あるとなお安心」 程度の防御的 case 提案 (= 当該実装の分岐構造から読み取れない仮想シナリオ)
+- 入力境界のうち当該実装で分岐していない値域への case 追加要求
+- assertion メッセージや comment の文言改善
+- test 内のリファクタ提案 (動作・観測対象を変えないもの)
+
+指摘対象は次のいずれかに限る:
+
+- (a) policy: [FLM_APP_0009](../../../vendor/flame/docs/adr/application/FLM_APP_0009__test.md) §決定 に明文化された policy への違反
+- (b) sufficiency: 変更された endpoint / 公開関数の **実装の分岐構造から読み取れる** test ケース観点が抽出されておらず、 抜けが happy path / 主要な失敗パス / 実装上の境界値のいずれかに該当する
+- assertion が常に true な等価宣言になっている等、 test が振る舞いを意味のある粒度で見ていない構造的欠陥
+
+判断が拮抗する場合は **`No findings.` 側に倒す**。 sufficiency の判断は当該実装の分岐構造を一次情報源とし、 reviewer の想像で case 観点を補完しない。
+
 ## 注意
 
 - 一般的な技術プラクティス (可読性・命名・セキュリティ等) は general-practices-reviewer subagent の責務。 ここでは扱わない
