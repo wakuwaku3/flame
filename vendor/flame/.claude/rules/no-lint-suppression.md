@@ -5,10 +5,12 @@ paths:
   - "**/*.md"
   - "**/*.yaml"
   - "**/*.yml"
+  - "**/*.go"
   - .shellcheckrc
   - .markdownlint*
   - .yamllint*
   - actionlint.yaml
+  - "**/.golangci.yaml"
 ---
 
 # FLM_GEN_0006

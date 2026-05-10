@@ -5,10 +5,12 @@ paths:
   - "**/*.md"
   - "**/*.yaml"
   - "**/*.yml"
+  - "**/*.go"
   - .shellcheckrc
   - .markdownlint*
   - .yamllint*
   - actionlint.yaml
+  - "**/.golangci.yaml"
 ---
 
 # vendor SoT 側 rule への参照

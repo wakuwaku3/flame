@@ -184,6 +184,48 @@ func TestMerge3Way_YAML_Mapping_OverlayRemovesKey(t *testing.T) {
 	})
 }
 
+func TestMerge3Way_YAML_NestedMapping_NoBase(t *testing.T) {
+	t.Parallel()
+
+	// Arrange: 親 mapping は base にあるが nested key (`nested`) が base に無い + 子 value が mapping
+	input := &Merge3WayInput{
+		Strategy:     MergeDeep,
+		InstallPath:  "x.yaml",
+		BaseContent:  []byte("a: 1\n"),
+		TheirContent: []byte("a: 1\nnested:\n  x: 10\n"),
+		OurContent:   []byte("a: 1\nnested:\n  y: 20\n"),
+	}
+	// Act
+	out, err := Merge3Way(input)
+	// Assert: nil-safe 化された merge3WayYAMLMapping が baseMapNode=nil で正常に動作し、 vendor / overlay の両 key を merge する
+	require.NoError(t, err)
+	assert.Empty(t, out.Conflicts)
+	s := string(out.Content)
+	assert.Contains(t, s, "x: 10")
+	assert.Contains(t, s, "y: 20")
+}
+
+func TestMerge3Way_YAML_NestedSequence_NoBase(t *testing.T) {
+	t.Parallel()
+
+	// Arrange: 親 mapping は base にあるが nested key (`items`) が base に無い + 子 value が sequence
+	input := &Merge3WayInput{
+		Strategy:     MergeDeep,
+		InstallPath:  "x.yaml",
+		BaseContent:  []byte("a: 1\n"),
+		TheirContent: []byte("a: 1\nitems:\n  - x\n"),
+		OurContent:   []byte("a: 1\nitems:\n  - y\n"),
+	}
+	// Act
+	out, err := Merge3Way(input)
+	// Assert: nil-safe 化された merge3WayYAMLSequence が baseSeqNode=nil で正常に動作し、 their / our 両要素を union する
+	require.NoError(t, err)
+	assert.Empty(t, out.Conflicts)
+	s := string(out.Content)
+	assert.Contains(t, s, "- x")
+	assert.Contains(t, s, "- y")
+}
+
 func TestMerge3Way_YAML_NestedScalar_NoBase_Conflict(t *testing.T) {
 	t.Parallel()
 

@@ -19,7 +19,7 @@ flame では lint の抑制を以下のルールで扱う。
 
 ### lint config ファイルにはコメントを書かない / 理由は ADR §影響 に書く
 
-- lint config ファイル (`.golangci.yaml` / `.markdownlint-cli2.yaml` / `.shellcheckrc` / `.yamllint` / `cli/.golangci.yaml` 等) には **コメントを一切書かない**。 機械可読な設定値のみを置く
+- lint config ファイル (`.golangci.yaml` / `.markdownlint-cli2.yaml` / `.shellcheckrc` / `.yamllint` 等の repo root 直下汎用 config と、 各 module 直下に置かれる module 専用 lint config 一切を含む) には **コメントを一切書かない**。 機械可読な設定値のみを置く
 - ルールをグローバル無効化する場合、 「なぜ flame ではこのルールが不適切か」 という理由は **当該無効化を要請する ADR の §影響 セクション** に記述する。 lint config 側は当該 ADR と紐付かない単なる設定値として保つ
 - AI エージェントが context window に lint config を取り込む際の token 消費・通信コスト・推論時間を縮小する観点と整合する ([FLM_APP_0010](../application/FLM_APP_0010__code_comment.md) §背景 と同じ動機)
 - 設計選択を ADR §影響 に集約することで、 「なぜそうなっているか」 を ADR から辿る単一情報源運用に揃う ([FLM_GEN_0001](FLM_GEN_0001__adr.md))
