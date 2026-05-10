@@ -21,19 +21,6 @@ flame では ADR PREFIX を以下の対応で運用する。
 
 各 PREFIX × カテゴリで 1 から欠番なく採番する ([FLM_GEN_0001](../../../vendor/flame/docs/adr/general/FLM_GEN_0001__adr.md) §採番)。
 
-### 既存 ADR の対応
-
-採択時点での既存 ADR:
-
-- **downstream** (`FLM_*`、 `vendor/flame/docs/adr/` 配下):
-  - GEN: `FLM_GEN_0001` ~ `FLM_GEN_0007`
-  - APP: `FLM_APP_0001` ~ `FLM_APP_0010`
-  - ENG: `FLM_ENG_0001` ~ `FLM_ENG_0005`
-  - FEA: `FLM_FEA_0001` ~ `FLM_FEA_0005`
-- **flame-internal** (`FLI_*`、 flame self の `docs/adr/` 配下):
-  - GEN: `FLI_GEN_0001` (本 ADR)
-  - FEA: `FLI_FEA_0001` (github_release) / `FLI_FEA_0002` (flame_cli)
-
 ## 影響
 
 - flame の ADR 内で `FLI_*` / `FLM_*` の用法は本 ADR で固定される。 PREFIX の追加・変更が必要になった場合は本 ADR を改訂する

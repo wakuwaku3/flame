@@ -12,18 +12,7 @@
 
 ## 決定
 
-flame self repo の Claude Code セッションは **PATH shadow した `claude` wrapper** で起動経路を一本化する。
-
-### wrapper の配置
-
-- 配置: repo root の `scripts/claude` (executable、 拡張子なし)
-- PATH 通し: repo root `.envrc` で `PATH_add scripts` する。 direnv 経由で repo (もしくは worktree) に cd した時点で `scripts/` が PATH 先頭に入る
-
-### wrapper の挙動
-
-- cwd 起点で `git rev-parse --show-toplevel` を解決し、 `<repo_root>/plugins/flame/.claude-plugin/plugin.json` が存在する場合に限り real claude を `--plugin-dir <repo_root>/plugins/flame` 付きで exec する
-- plugin manifest が存在しない / git repo 外の場合は素通し (= real claude をそのまま exec する)
-- self が PATH 先頭に居るため自己再帰回避が必要。 wrapper 自身の dir を PATH から除外した上で `command -v claude` で real claude を解決する
+flame self repo の Claude Code セッションは PATH shadow した `claude` wrapper で起動経路を一本化する。 wrapper は cwd の git context に従って plugin manifest が存在する場合のみ plugin 込みで real claude を exec し、 plugin manifest が無い / git repo 外の場合は素通しする。 wrapper 自身が PATH 先頭にいるため自己再帰回避を行う。
 
 ## 影響
 
@@ -34,6 +23,9 @@ flame self repo の Claude Code セッションは **PATH shadow した `claude`
 - worktree に `plugins/flame` が存在しない場合は plugin 抜きで素通しされる
 - wrapper script は shellcheck / shebang 規約等の通常の shell script 静的検査の対象になる ([FLM_APP_0002](../../../vendor/flame/docs/adr/application/FLM_APP_0002__shell_script.md))
 - repo の `.claude/settings.json` には plugin 有効化用の `enabledPlugins` を持たない。 wrapper の `--plugin-dir` がセッション単位で plugin を有効化するため `enabledPlugins` 経由は不要であり、 仮に `enabledPlugins: { "flame@flame": true }` を持つと Claude Code が marketplace `flame` を解決しようとして `Plugin not found in marketplace "flame"` エラーが /plugins UI に出続ける (本 repo は marketplace を user scope に export しないため)
+- wrapper 実装は repo root の `scripts/claude` (executable、 拡張子なし) に置き、 repo root `.envrc` の `PATH_add scripts` で direnv 経由 PATH 先頭に通す
+- wrapper 内部では cwd 起点で `git rev-parse --show-toplevel` を解決し、 plugin manifest path `<repo_root>/plugins/flame/.claude-plugin/plugin.json` の有無で plugin 込み (`--plugin-dir <repo_root>/plugins/flame` を付与) / 素通しを分岐する
+- 自己再帰回避は wrapper 自身の dir を PATH から除外した上で `command -v claude` で real claude を解決する形で実装する
 - 本 ADR は flame self の internal ADR ([FLI_GEN_0001](../general/FLI_GEN_0001__adr_prefix.md))。 利用側 repo には配布されない
 
 ## 評価
