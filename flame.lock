@@ -1,279 +1,524 @@
 ---
 # flame harness lockfile (FLM_FEA_0003、 CLI 自動生成・更新)
 flame:
-  harness:
-    files:
-      - install: .golangci.yaml
-        vendor: vendor/flame/.golangci.yaml
-        merge: deep
-        content: |
-          ---
+  installed:
+    source: github.com/wakuwaku3/flame
+    version: self
+  files:
+    - install: .golangci.yaml
+      vendor: vendor/flame/.golangci.yaml
+      merge: deep
+      content: |
+        ---
 
-          version: "2"
+        version: "2"
 
-          run:
-            timeout: 5m
+        run:
+          timeout: 5m
 
-          linters:
-            default: none
+        linters:
+          default: none
 
-            enable:
-              - errcheck
-              - govet
-              - ineffassign
-              - staticcheck
-              - unused
+          enable:
+            - errcheck
+            - govet
+            - ineffassign
+            - staticcheck
+            - unused
 
-              - bodyclose
-              - contextcheck
-              - copyloopvar
-              - durationcheck
-              - errchkjson
-              - errname
-              - errorlint
-              - exhaustive
-              - exhaustruct
-              - exptostd
-              - fatcontext
-              - forcetypeassert
-              - gocheckcompilerdirectives
-              - gomoddirectives
-              - gosec
-              - intrange
-              - iotamixing
-              - makezero
-              - mirror
-              - modernize
-              - nilerr
-              - nilnesserr
-              - nilnil
-              - noctx
-              - nosprintfhostport
-              - predeclared
-              - protogetter
-              - reassign
-              - recvcheck
-              - rowserrcheck
-              - sqlclosecheck
-              - usestdlibvars
-              - wastedassign
-              - wrapcheck
+            - bodyclose
+            - contextcheck
+            - copyloopvar
+            - durationcheck
+            - errchkjson
+            - errname
+            - errorlint
+            - exhaustive
+            - exhaustruct
+            - exptostd
+            - fatcontext
+            - forcetypeassert
+            - gocheckcompilerdirectives
+            - gomoddirectives
+            - gosec
+            - intrange
+            - iotamixing
+            - makezero
+            - mirror
+            - modernize
+            - nilerr
+            - nilnesserr
+            - nilnil
+            - noctx
+            - nosprintfhostport
+            - predeclared
+            - protogetter
+            - reassign
+            - recvcheck
+            - rowserrcheck
+            - sqlclosecheck
+            - usestdlibvars
+            - wastedassign
+            - wrapcheck
 
-              - gocritic
-              - perfsprint
-              - prealloc
-              - revive
-              - unconvert
-              - unparam
+            - gocritic
+            - perfsprint
+            - prealloc
+            - revive
+            - unconvert
+            - unparam
 
-              - godot
-              - misspell
+            - godot
+            - misspell
 
-              - paralleltest
-              - testableexamples
-              - testifylint
-              - thelper
-              - tparallel
-              - usetesting
+            - paralleltest
+            - testableexamples
+            - testifylint
+            - thelper
+            - tparallel
+            - usetesting
 
-              - mnd
+            - mnd
 
-              - forbidigo
+            - forbidigo
 
-            settings:
-              govet:
-                enable-all: true
+          settings:
+            govet:
+              enable-all: true
 
-              staticcheck:
-                checks:
-                  - all
-                  - -ST1000
-                  - -ST1003
+            staticcheck:
+              checks:
+                - all
+                - -ST1000
+                - -ST1003
 
-              revive:
-                enable-all-rules: false
-                rules:
-                  - name: blank-imports
-                  - name: context-as-argument
-                    arguments:
-                      - allowTypesBefore: "*testing.T,*testing.B,*testing.F,testing.TB"
-                  - name: context-keys-type
-                  - name: dot-imports
-                  - name: error-return
-                  - name: error-naming
-                  - name: if-return
-                  - name: indent-error-flow
-                  - name: range
-                  - name: receiver-naming
-                  - name: redefines-builtin-id
-                  - name: superfluous-else
-                  - name: time-naming
-                  - name: unreachable-code
+            revive:
+              enable-all-rules: false
+              rules:
+                - name: blank-imports
+                - name: context-as-argument
+                  arguments:
+                    - allowTypesBefore: "*testing.T,*testing.B,*testing.F,testing.TB"
+                - name: context-keys-type
+                - name: dot-imports
+                - name: error-return
+                - name: error-naming
+                - name: if-return
+                - name: indent-error-flow
+                - name: range
+                - name: receiver-naming
+                - name: redefines-builtin-id
+                - name: superfluous-else
+                - name: time-naming
+                - name: unreachable-code
 
-              gocritic:
-                enabled-tags:
-                  - diagnostic
-                  - performance
-                  - style
+            gocritic:
+              enabled-tags:
+                - diagnostic
+                - performance
+                - style
 
-              misspell:
-                locale: US
+            misspell:
+              locale: US
 
-              mnd:
-                checks:
-                  - argument
-                  - case
-                  - condition
-                  - operation
-                  - return
-                  - assign
+            mnd:
+              checks:
+                - argument
+                - case
+                - condition
+                - operation
+                - return
+                - assign
 
-              exhaustive:
-                default-signifies-exhaustive: false
+            exhaustive:
+              default-signifies-exhaustive: false
 
-              forbidigo:
-                forbid:
-                  - pattern: '^new$'
-                    msg: >-
-                      use a struct literal with all fields or a constructor function
-                      instead of new() (FLM_APP_0007 §公開 struct の最小化)
-                  - pattern: '^assert\.JSONEq(f)?$'
-                    msg: >-
-                      use raw string comparison (assert.Equal) instead of assert.JSONEq
-                      (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
-                  - pattern: '^require\.JSONEq(f)?$'
-                    msg: >-
-                      use raw string comparison (require.Equal) instead of require.JSONEq
-                      (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
-                  - pattern: '^assert\.YAMLEq(f)?$'
-                    msg: >-
-                      use raw string comparison (assert.Equal) instead of assert.YAMLEq
-                      (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
-                  - pattern: '^require\.YAMLEq(f)?$'
-                    msg: >-
-                      use raw string comparison (require.Equal) instead of require.YAMLEq
-                      (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
+            forbidigo:
+              forbid:
+                - pattern: '^new$'
+                  msg: >-
+                    use a struct literal with all fields or a constructor function
+                    instead of new() (FLM_APP_0007 §公開 struct の最小化)
+                - pattern: '^assert\.JSONEq(f)?$'
+                  msg: >-
+                    use raw string comparison (assert.Equal) instead of assert.JSONEq
+                    (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
+                - pattern: '^require\.JSONEq(f)?$'
+                  msg: >-
+                    use raw string comparison (require.Equal) instead of require.JSONEq
+                    (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
+                - pattern: '^assert\.YAMLEq(f)?$'
+                  msg: >-
+                    use raw string comparison (assert.Equal) instead of assert.YAMLEq
+                    (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
+                - pattern: '^require\.YAMLEq(f)?$'
+                  msg: >-
+                    use raw string comparison (require.Equal) instead of require.YAMLEq
+                    (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
 
-              wrapcheck:
-                ignore-sigs:
-                  - .Errorf(
-                  - errors.New(
-                  - errors.Unwrap(
-                  - errors.Join(
-                  - .Wrap(
-                  - .Wrapf(
-                  - .WithMessage(
-                  - .WithMessagef(
-                  - .WithStack(
-                  - ex.New(
-                  - ex.Errorf(
-                  - ex.Wrap(
-                  - ex.Wrapf(
+            wrapcheck:
+              ignore-sigs:
+                - .Errorf(
+                - errors.New(
+                - errors.Unwrap(
+                - errors.Join(
+                - .Wrap(
+                - .Wrapf(
+                - .WithMessage(
+                - .WithMessagef(
+                - .WithStack(
+                - ex.New(
+                - ex.Errorf(
+                - ex.Wrap(
+                - ex.Wrapf(
 
-              errcheck:
-                check-type-assertions: true
-                check-blank: false
-                exclude-functions:
-                  - fmt.Fprint
-                  - fmt.Fprintf
-                  - fmt.Fprintln
-                  - io.WriteString
+            errcheck:
+              check-type-assertions: true
+              check-blank: false
+              exclude-functions:
+                - fmt.Fprint
+                - fmt.Fprintf
+                - fmt.Fprintln
+                - io.WriteString
 
-              gosec:
-                severity: low
-                confidence: low
-                excludes:
-                  - G304
+            gosec:
+              severity: low
+              confidence: low
+              excludes:
+                - G304
 
-              gomoddirectives:
-                replace-local: false
-                replace-allow-list: []
+            gomoddirectives:
+              replace-local: false
+              replace-allow-list: []
 
-            exclusions:
-              generated: strict
-              presets: []
-              rules: []
-              paths: []
-              paths-except: []
+          exclusions:
+            generated: strict
+            presets: []
+            rules: []
+            paths: []
+            paths-except: []
 
-          formatters:
-            enable:
-              - gofmt
-              - gofumpt
-              - goimports
+        formatters:
+          enable:
+            - gofmt
+            - gofumpt
+            - goimports
 
-            settings:
-              gofumpt:
-                extra-rules: true
+          settings:
+            gofumpt:
+              extra-rules: true
 
-          issues:
-            max-issues-per-linter: 0
-            max-same-issues: 0
-      - install: .markdownlint-cli2.yaml
-        vendor: vendor/flame/.markdownlint-cli2.yaml
-        merge: deep
-        content: |
-          ---
-          config:
-            MD013: false
-      - install: .shellcheckrc
-        vendor: vendor/flame/.shellcheckrc
-        merge: append
-        content: |
-          disable=SC2016
-      - install: .vscode/extensions.json
-        vendor: vendor/flame/.vscode/extensions.json
-        merge: deep
-        content: |
-          {
-            "recommendations": [
-              "golang.go",
-              "GitHub.vscode-pull-request-github",
-              "github.vscode-github-actions",
-              "mkhl.direnv"
+        issues:
+          max-issues-per-linter: 0
+          max-same-issues: 0
+      vendor_content: |
+        ---
+
+        version: "2"
+
+        run:
+          timeout: 5m
+
+        linters:
+          default: none
+
+          enable:
+            - errcheck
+            - govet
+            - ineffassign
+            - staticcheck
+            - unused
+
+            - bodyclose
+            - contextcheck
+            - copyloopvar
+            - durationcheck
+            - errchkjson
+            - errname
+            - errorlint
+            - exhaustive
+            - exhaustruct
+            - exptostd
+            - fatcontext
+            - forcetypeassert
+            - gocheckcompilerdirectives
+            - gomoddirectives
+            - gosec
+            - intrange
+            - iotamixing
+            - makezero
+            - mirror
+            - modernize
+            - nilerr
+            - nilnesserr
+            - nilnil
+            - noctx
+            - nosprintfhostport
+            - predeclared
+            - protogetter
+            - reassign
+            - recvcheck
+            - rowserrcheck
+            - sqlclosecheck
+            - usestdlibvars
+            - wastedassign
+            - wrapcheck
+
+            - gocritic
+            - perfsprint
+            - prealloc
+            - revive
+            - unconvert
+            - unparam
+
+            - godot
+            - misspell
+
+            - paralleltest
+            - testableexamples
+            - testifylint
+            - thelper
+            - tparallel
+            - usetesting
+
+            - mnd
+
+            - forbidigo
+
+          settings:
+            govet:
+              enable-all: true
+
+            staticcheck:
+              checks:
+                - all
+                - -ST1000
+                - -ST1003
+
+            revive:
+              enable-all-rules: false
+              rules:
+                - name: blank-imports
+                - name: context-as-argument
+                  arguments:
+                    - allowTypesBefore: "*testing.T,*testing.B,*testing.F,testing.TB"
+                - name: context-keys-type
+                - name: dot-imports
+                - name: error-return
+                - name: error-naming
+                - name: if-return
+                - name: indent-error-flow
+                - name: range
+                - name: receiver-naming
+                - name: redefines-builtin-id
+                - name: superfluous-else
+                - name: time-naming
+                - name: unreachable-code
+
+            gocritic:
+              enabled-tags:
+                - diagnostic
+                - performance
+                - style
+
+            misspell:
+              locale: US
+
+            mnd:
+              checks:
+                - argument
+                - case
+                - condition
+                - operation
+                - return
+                - assign
+
+            exhaustive:
+              default-signifies-exhaustive: false
+
+            forbidigo:
+              forbid:
+                - pattern: '^new$'
+                  msg: >-
+                    use a struct literal with all fields or a constructor function
+                    instead of new() (FLM_APP_0007 §公開 struct の最小化)
+                - pattern: '^assert\.JSONEq(f)?$'
+                  msg: >-
+                    use raw string comparison (assert.Equal) instead of assert.JSONEq
+                    (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
+                - pattern: '^require\.JSONEq(f)?$'
+                  msg: >-
+                    use raw string comparison (require.Equal) instead of require.JSONEq
+                    (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
+                - pattern: '^assert\.YAMLEq(f)?$'
+                  msg: >-
+                    use raw string comparison (assert.Equal) instead of assert.YAMLEq
+                    (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
+                - pattern: '^require\.YAMLEq(f)?$'
+                  msg: >-
+                    use raw string comparison (require.Equal) instead of require.YAMLEq
+                    (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
+
+            wrapcheck:
+              ignore-sigs:
+                - .Errorf(
+                - errors.New(
+                - errors.Unwrap(
+                - errors.Join(
+                - .Wrap(
+                - .Wrapf(
+                - .WithMessage(
+                - .WithMessagef(
+                - .WithStack(
+                - ex.New(
+                - ex.Errorf(
+                - ex.Wrap(
+                - ex.Wrapf(
+
+            errcheck:
+              check-type-assertions: true
+              check-blank: false
+              exclude-functions:
+                - fmt.Fprint
+                - fmt.Fprintf
+                - fmt.Fprintln
+                - io.WriteString
+
+            gosec:
+              severity: low
+              confidence: low
+              excludes:
+                - G304
+
+            gomoddirectives:
+              replace-local: false
+              replace-allow-list: []
+
+          exclusions:
+            generated: strict
+            presets: []
+            rules: []
+            paths: []
+            paths-except: []
+
+        formatters:
+          enable:
+            - gofmt
+            - gofumpt
+            - goimports
+
+          settings:
+            gofumpt:
+              extra-rules: true
+
+        issues:
+          max-issues-per-linter: 0
+          max-same-issues: 0
+    - install: .markdownlint-cli2.yaml
+      vendor: vendor/flame/.markdownlint-cli2.yaml
+      merge: deep
+      content: |
+        ---
+        config:
+          MD013: false
+      vendor_content: |
+        ---
+        config:
+          MD013: false
+    - install: .shellcheckrc
+      vendor: vendor/flame/.shellcheckrc
+      merge: append
+      content: |
+        disable=SC2016
+      vendor_content: |
+        disable=SC2016
+    - install: .vscode/extensions.json
+      vendor: vendor/flame/.vscode/extensions.json
+      merge: deep
+      content: |
+        {
+          "recommendations": [
+            "golang.go",
+            "GitHub.vscode-pull-request-github",
+            "github.vscode-github-actions",
+            "mkhl.direnv"
+          ]
+        }
+      vendor_content: |
+        {
+          "recommendations": [
+            "golang.go",
+            "GitHub.vscode-pull-request-github",
+            "github.vscode-github-actions",
+            "mkhl.direnv"
+          ]
+        }
+    - install: .vscode/settings.json
+      vendor: vendor/flame/.vscode/settings.json
+      merge: deep
+      content: |
+        {
+            "git.detectWorktrees": true
+        }
+      vendor_content: |
+        {
+            "git.detectWorktrees": true
+        }
+    - install: devbox.json
+      vendor: vendor/flame/devbox.json
+      merge: deep
+      content: |
+        {
+          "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.2/.schema/devbox.schema.json",
+          "packages": [
+            "act@0.2.87",
+            "actionlint@1.7.12",
+            "gh@2.91.0",
+            "go@1.26.2",
+            "golangci-lint@2.11.4",
+            "jq@1.8.1",
+            "markdownlint-cli2@0.21.0",
+            "shellcheck@0.11.0",
+            "yamllint@1.37.1",
+            "yq-go@4.53.2"
+          ],
+          "shell": {
+            "init_hook": [
+              "bash vendor/flame/devbox/init.sh"
             ]
           }
-      - install: .vscode/settings.json
-        vendor: vendor/flame/.vscode/settings.json
-        merge: deep
-        content: |
-          {
-              "git.detectWorktrees": true
+        }
+      vendor_content: |
+        {
+          "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.2/.schema/devbox.schema.json",
+          "packages": [
+            "act@0.2.87",
+            "actionlint@1.7.12",
+            "gh@2.91.0",
+            "go@1.26.2",
+            "golangci-lint@2.11.4",
+            "jq@1.8.1",
+            "markdownlint-cli2@0.21.0",
+            "shellcheck@0.11.0",
+            "yamllint@1.37.1",
+            "yq-go@4.53.2"
+          ],
+          "shell": {
+            "init_hook": [
+              "bash vendor/flame/devbox/init.sh"
+            ]
           }
-      - install: devbox.json
-        vendor: vendor/flame/devbox.json
-        merge: deep
-        content: |
-          {
-            "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.2/.schema/devbox.schema.json",
-            "packages": [
-              "act@0.2.87",
-              "actionlint@1.7.12",
-              "gh@2.91.0",
-              "go@1.26.2",
-              "golangci-lint@2.11.4",
-              "jq@1.8.1",
-              "markdownlint-cli2@0.21.0",
-              "shellcheck@0.11.0",
-              "yamllint@1.37.1",
-              "yq-go@4.53.2"
-            ],
-            "shell": {
-              "init_hook": [
-                "bash vendor/flame/devbox/init.sh"
-              ]
-            }
-          }
-    embeds:
-      - install: CLAUDE.md
-        target: vendor/flame/CLAUDE.md
-        snippet: |
-          [vendor/flame/CLAUDE.md](vendor/flame/CLAUDE.md)
-      - install: .envrc
-        target: vendor/flame/.envrc
-        snippet: |
-          source_env_if_exists vendor/flame/.envrc
-      - install: .yamllint
-        target: vendor/flame/.yamllint
-        snippet: |
-          extends: vendor/flame/.yamllint
+        }
+  embeds:
+    - install: CLAUDE.md
+      target: vendor/flame/CLAUDE.md
+      snippet: |
+        [vendor/flame/CLAUDE.md](vendor/flame/CLAUDE.md)
+    - install: .envrc
+      target: vendor/flame/.envrc
+      snippet: |
+        source_env_if_exists vendor/flame/.envrc
+    - install: .yamllint
+      target: vendor/flame/.yamllint
+      snippet: |
+        extends: vendor/flame/.yamllint

@@ -1,0 +1,187 @@
+package install
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/wakuwaku3/flame/cli/internal/fsperm"
+)
+
+func TestMakeVendorReadOnly(t *testing.T) {
+	t.Parallel()
+
+	t.Run("file は 444 / dir は 555 で readonly 化する", func(t *testing.T) {
+		t.Parallel()
+		root := buildVendorTree(t)
+		// t.TempDir() cleanup が unlink できるよう、 test 終了前に writable に戻す
+		t.Cleanup(func() {
+			_ = makeVendorWritable(context.Background(), root)
+		})
+
+		require.NoError(t, makeVendorReadOnly(context.Background(), root))
+
+		assertPerm(t, root, readOnlyDirPerm)
+		assertPerm(t, filepath.Join(root, ".claude"), readOnlyDirPerm)
+		assertPerm(t, filepath.Join(root, "CLAUDE.md"), readOnlyPerm)
+		assertPerm(t, filepath.Join(root, ".claude", "rules", "x.md"), readOnlyPerm)
+	})
+}
+
+func TestSyncVendor_ErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("vendor-sync ignored で vendor 不在は error (self mode の典型ケース)", func(t *testing.T) {
+		t.Parallel()
+		// Arrange: ADR FLM_FEA_0003 §source 提供元 repo の特例 で「version 値と ignore directive の重複検査を持たない」 と決定済のため、 self mode の挙動も `flame.ignore: [vendor-sync]` 経由で同等に表現される。
+		root := t.TempDir()
+		m := &Manifest{Source: "github.com/wakuwaku3/flame", Version: SelfVersion, Ignore: map[Feature]struct{}{FeatureVendorSync: {}}, Stage1ExtraAgents: nil}
+		// Act
+		err := SyncVendor(context.Background(), root, m, &Lock{Installed: nil, Files: nil, Embeds: nil})
+		// Assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "vendor-sync` is ignored")
+	})
+
+	t.Run("downstream version + vendor-sync ignored で vendor 不在も error", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		root := t.TempDir()
+		m := &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: map[Feature]struct{}{FeatureVendorSync: {}}, Stage1ExtraAgents: nil}
+		// Act
+		err := SyncVendor(context.Background(), root, m, &Lock{Installed: nil, Files: nil, Embeds: nil})
+		// Assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "vendor-sync` is ignored")
+	})
+}
+
+func TestNeedsRefetch(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		prev *Lock
+		m    *Manifest
+		name string
+		want bool
+	}{
+		{
+			name: "前回 install 記録なしは false (旧 schema / 初回)",
+			prev: &Lock{Installed: nil, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: false,
+		},
+		{
+			name: "前回と同一 source / version は false",
+			prev: &Lock{Installed: &LockInstalled{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", TreeHash: "sha256:x"}, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: false,
+		},
+		{
+			name: "version が異なれば true",
+			prev: &Lock{Installed: &LockInstalled{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", TreeHash: "sha256:x"}, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.1.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: true,
+		},
+		{
+			name: "source が異なれば true",
+			prev: &Lock{Installed: &LockInstalled{Source: "github.com/old/flame", Version: "v1.0.0", TreeHash: "sha256:x"}, Files: nil, Embeds: nil},
+			m:    &Manifest{Source: "github.com/wakuwaku3/flame", Version: "v1.0.0", Ignore: nil, Stage1ExtraAgents: nil},
+			want: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := needsRefetch(tc.prev, tc.m)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestMakeVendorWritable(t *testing.T) {
+	t.Parallel()
+
+	t.Run("readonly 化された tree を 644/755 に戻せる", func(t *testing.T) {
+		t.Parallel()
+		root := buildVendorTree(t)
+		require.NoError(t, makeVendorReadOnly(context.Background(), root))
+
+		require.NoError(t, makeVendorWritable(context.Background(), root))
+
+		assertPerm(t, root, dirPerm)
+		assertPerm(t, filepath.Join(root, ".claude"), dirPerm)
+		assertPerm(t, filepath.Join(root, "CLAUDE.md"), filePerm)
+		require.NoError(t, os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("after"), fsperm.File))
+	})
+}
+
+func TestNormalizeGitURL(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "https はそのまま", in: "https://github.com/wakuwaku3/flame", want: "https://github.com/wakuwaku3/flame"},
+		{name: "git@ はそのまま (SSH)", in: "git@github.com:wakuwaku3/flame.git", want: "git@github.com:wakuwaku3/flame.git"},
+		{name: "github.com/owner/repo は https:// prefix を補完", in: "github.com/wakuwaku3/flame", want: "https://github.com/wakuwaku3/flame"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, normalizeGitURL(tc.in))
+		})
+	}
+}
+
+func TestCopyTree(t *testing.T) {
+	t.Parallel()
+
+	t.Run("file 内容と dir 構造が保存される", func(t *testing.T) {
+		t.Parallel()
+		src := t.TempDir()
+		dst := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(src, "sub"), fsperm.Dir))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "a.txt"), []byte("alpha"), fsperm.File))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "sub", "b.txt"), []byte("bravo"), fsperm.File))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "exec.sh"), []byte("#!/bin/sh\n"), fsperm.Exec))
+
+		require.NoError(t, copyTree(context.Background(), src, dst))
+
+		assertPerm(t, filepath.Join(dst, "a.txt"), filePerm)
+		assert.Equal(t, "alpha", string(mustReadFile(t, filepath.Join(dst, "a.txt"))))
+		assert.Equal(t, "bravo", string(mustReadFile(t, filepath.Join(dst, "sub", "b.txt"))))
+		info, err := os.Stat(filepath.Join(dst, "exec.sh"))
+		require.NoError(t, err)
+		assert.NotZero(t, info.Mode().Perm()&os.FileMode(0o111))
+	})
+}
+
+func mustReadFile(tb testing.TB, path string) []byte {
+	tb.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(tb, err)
+	return data
+}
+
+func buildVendorTree(tb testing.TB) string {
+	tb.Helper()
+	root := tb.TempDir()
+	require.NoError(tb, os.MkdirAll(filepath.Join(root, ".claude", "rules"), fsperm.Dir))
+	require.NoError(tb, os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("vendor claude\n"), fsperm.File))
+	require.NoError(tb, os.WriteFile(filepath.Join(root, ".claude", "rules", "x.md"), []byte("rule\n"), fsperm.File))
+	return root
+}
+
+func assertPerm(tb testing.TB, path string, expected os.FileMode) {
+	tb.Helper()
+	info, err := os.Stat(path)
+	require.NoError(tb, err)
+	assert.Equal(tb, expected, info.Mode().Perm(), "perm mismatch for %s", path)
+}

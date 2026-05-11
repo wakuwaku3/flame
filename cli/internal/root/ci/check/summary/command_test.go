@@ -16,6 +16,7 @@ type sumCase struct {
 	check          string
 	noop           string
 	label          string
+	installDrift   string
 	expectedStdout string
 	expectedStderr string
 	expectedCode   int
@@ -24,57 +25,64 @@ type sumCase struct {
 func sumCases() []sumCase {
 	return []sumCase{
 		{
-			name:   "bucket success / check success / noop skipped / label success",
-			bucket: "success", check: "success", noop: "skipped", label: "success",
-			expectedStdout: "OK: bucket=success check=success noop=skipped label=success\n",
+			name:   "bucket success / check success / noop skipped / label success / install_drift success",
+			bucket: "success", check: "success", noop: "skipped", label: "success", installDrift: "success",
+			expectedStdout: "OK: bucket=success check=success noop=skipped label=success install_drift=success\n",
 			expectedStderr: "",
 			expectedCode:   0,
 		},
 		{
-			name:   "bucket success / check skipped / noop success / label success",
-			bucket: "success", check: "skipped", noop: "success", label: "success",
-			expectedStdout: "OK: bucket=success check=skipped noop=success label=success\n",
+			name:   "bucket success / check skipped / noop success / label success / install_drift success",
+			bucket: "success", check: "skipped", noop: "success", label: "success", installDrift: "success",
+			expectedStdout: "OK: bucket=success check=skipped noop=success label=success install_drift=success\n",
 			expectedStderr: "",
 			expectedCode:   0,
 		},
 		{
-			name:   "bucket success / check success / noop skipped / label skipped (fork PR)",
-			bucket: "success", check: "success", noop: "skipped", label: "skipped",
-			expectedStdout: "OK: bucket=success check=success noop=skipped label=skipped\n",
+			name:   "bucket success / check success / noop skipped / label skipped (fork PR) / install_drift success",
+			bucket: "success", check: "success", noop: "skipped", label: "skipped", installDrift: "success",
+			expectedStdout: "OK: bucket=success check=success noop=skipped label=skipped install_drift=success\n",
 			expectedStderr: "",
 			expectedCode:   0,
 		},
 		{
 			name:   "bucket failure → bucket job did not succeed",
-			bucket: "failure", check: "success", noop: "skipped", label: "success",
+			bucket: "failure", check: "success", noop: "skipped", label: "success", installDrift: "success",
 			expectedStdout: "",
 			expectedStderr: "bucket job did not succeed (result=failure)\n",
 			expectedCode:   1,
 		},
 		{
 			name:   "check failure → CHECK job result was 'failure'",
-			bucket: "success", check: "failure", noop: "skipped", label: "success",
+			bucket: "success", check: "failure", noop: "skipped", label: "success", installDrift: "success",
 			expectedStdout: "",
 			expectedStderr: "CHECK job result was 'failure' (expected success or skipped)\n",
 			expectedCode:   1,
 		},
 		{
 			name:   "noop canceled → NOOP job result was 'canceled'",
-			bucket: "success", check: "skipped", noop: "canceled", label: "success",
+			bucket: "success", check: "skipped", noop: "canceled", label: "success", installDrift: "success",
 			expectedStdout: "",
 			expectedStderr: "NOOP job result was 'canceled' (expected success or skipped)\n",
 			expectedCode:   1,
 		},
 		{
 			name:   "label failure → LABEL job result was 'failure'",
-			bucket: "success", check: "success", noop: "skipped", label: "failure",
+			bucket: "success", check: "success", noop: "skipped", label: "failure", installDrift: "success",
 			expectedStdout: "",
 			expectedStderr: "LABEL job result was 'failure' (expected success or skipped)\n",
 			expectedCode:   1,
 		},
 		{
+			name:   "install_drift failure → INSTALL_DRIFT job result was 'failure'",
+			bucket: "success", check: "success", noop: "skipped", label: "success", installDrift: "failure",
+			expectedStdout: "",
+			expectedStderr: "INSTALL_DRIFT job result was 'failure' (expected success or skipped)\n",
+			expectedCode:   1,
+		},
+		{
 			name:   "check skipped かつ noop skipped → neither check nor noop succeeded",
-			bucket: "success", check: "skipped", noop: "skipped", label: "success",
+			bucket: "success", check: "skipped", noop: "skipped", label: "success", installDrift: "success",
 			expectedStdout: "",
 			expectedStderr: "neither check nor noop succeeded\n",
 			expectedCode:   1,
@@ -90,6 +98,7 @@ func TestRun(t *testing.T) {
 			t.Setenv("CHECK_RESULT", tc.check)
 			t.Setenv("NOOP_RESULT", tc.noop)
 			t.Setenv("LABEL_RESULT", tc.label)
+			t.Setenv("INSTALL_DRIFT_RESULT", tc.installDrift)
 			r := clix.NewRoot(clix.NewRootConfig("flame", "test"))
 			r.AddCommand(summary.New())
 			fake := clix.NewFakeIO(t, []string{"summary"})

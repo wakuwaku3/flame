@@ -33,6 +33,10 @@ func run(_ context.Context, in clix.RunInput) error {
 	if err != nil {
 		return ex.Wrap(err)
 	}
+	installDrift, err := requireEnv("INSTALL_DRIFT_RESULT")
+	if err != nil {
+		return ex.Wrap(err)
+	}
 
 	if bucket != "success" {
 		fmt.Fprintf(in.Stderr(), "bucket job did not succeed (result=%s)\n", bucket)
@@ -42,6 +46,7 @@ func run(_ context.Context, in clix.RunInput) error {
 		{"CHECK", check},
 		{"NOOP", noop},
 		{"LABEL", label},
+		{"INSTALL_DRIFT", installDrift},
 	} {
 		if !isOkTerminal(pair.value) {
 			return failJob(in.Stderr(), pair.name, pair.value)
@@ -51,7 +56,7 @@ func run(_ context.Context, in clix.RunInput) error {
 		fmt.Fprintln(in.Stderr(), "neither check nor noop succeeded")
 		return ex.Wrap(clix.NewExitError(exitCodeFailure))
 	}
-	fmt.Fprintf(in.Stdout(), "OK: bucket=%s check=%s noop=%s label=%s\n", bucket, check, noop, label)
+	fmt.Fprintf(in.Stdout(), "OK: bucket=%s check=%s noop=%s label=%s install_drift=%s\n", bucket, check, noop, label, installDrift)
 	return nil
 }
 

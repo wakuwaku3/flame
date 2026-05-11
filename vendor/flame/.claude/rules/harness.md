@@ -10,6 +10,7 @@ paths:
   - plugins/**
   - .github/workflows/wf__*.yaml
   - .github/workflows/flame-trg__*.yaml
+  - .gitignore
 ---
 
 # FLM_FEA_0003

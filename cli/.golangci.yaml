@@ -1,0 +1,205 @@
+---
+
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exhaustruct
+    - exptostd
+    - fatcontext
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    - gomoddirectives
+    - gosec
+    - intrange
+    - iotamixing
+    - makezero
+    - mirror
+    - modernize
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
+    - nosprintfhostport
+    - predeclared
+    - protogetter
+    - reassign
+    - recvcheck
+    - rowserrcheck
+    - sqlclosecheck
+    - usestdlibvars
+    - wastedassign
+    - wrapcheck
+
+    - gocritic
+    - perfsprint
+    - prealloc
+    - revive
+    - unconvert
+    - unparam
+
+    - godot
+    - misspell
+
+    - paralleltest
+    - testableexamples
+    - testifylint
+    - thelper
+    - tparallel
+    - usetesting
+
+    - mnd
+
+    - forbidigo
+
+  settings:
+    govet:
+      enable-all: true
+
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+
+    revive:
+      enable-all-rules: false
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+          arguments:
+            - allowTypesBefore: "*testing.T,*testing.B,*testing.F,testing.TB"
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unreachable-code
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+
+    misspell:
+      locale: US
+
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - operation
+        - return
+        - assign
+
+    exhaustive:
+      default-signifies-exhaustive: false
+
+    forbidigo:
+      forbid:
+        - pattern: '^new$'
+          msg: >-
+            use a struct literal with all fields or a constructor function
+            instead of new() (FLM_APP_0007 §公開 struct の最小化)
+        - pattern: '^assert\.JSONEq(f)?$'
+          msg: >-
+            use raw string comparison (assert.Equal) instead of assert.JSONEq
+            (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
+        - pattern: '^require\.JSONEq(f)?$'
+          msg: >-
+            use raw string comparison (require.Equal) instead of require.JSONEq
+            (FLM_APP_0009 §assertion 規約: JSON は生文字列で全体比較)
+        - pattern: '^assert\.YAMLEq(f)?$'
+          msg: >-
+            use raw string comparison (assert.Equal) instead of assert.YAMLEq
+            (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
+        - pattern: '^require\.YAMLEq(f)?$'
+          msg: >-
+            use raw string comparison (require.Equal) instead of require.YAMLEq
+            (FLM_APP_0009 §assertion 規約: YAML は生文字列で全体比較)
+
+    wrapcheck:
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap(
+        - errors.Join(
+        - .Wrap(
+        - .Wrapf(
+        - .WithMessage(
+        - .WithMessagef(
+        - .WithStack(
+        - ex.New(
+        - ex.Errorf(
+        - ex.Wrap(
+        - ex.Wrapf(
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - io.WriteString
+
+    gosec:
+      severity: low
+      confidence: low
+      excludes:
+        - G304
+        - G703
+        - G204
+        - G122
+
+    gomoddirectives:
+      replace-local: false
+      replace-allow-list: []
+
+  exclusions:
+    generated: strict
+    presets: []
+    rules: []
+    paths: []
+    paths-except: []
+
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+
+  settings:
+    gofumpt:
+      extra-rules: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
