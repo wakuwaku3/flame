@@ -64,32 +64,54 @@ func (r *root) Run(ctx context.Context, cio IO) error {
 	return ex.Wrap(r.cmd.Execute())
 }
 
-// RunInput は subcommand の runE が受け取る実行時 input。 第二引数を struct ではなく interface にすることで、 flag 等の追加時に runE の signature を破壊せずに後方互換に拡張できる (FLM_APP_0008)。 Stdin / Stdout / Stderr は service-level test (FLM_APP_0009) のため fake 化された stream を leaf に渡す経路で、 production では os.Stdin / os.Stdout / os.Stderr、 test では FakeIO 内の bytes.Reader / bytes.Buffer に解決される。
+// RunInput は subcommand の runE が受け取る実行時 input。 第二引数を struct ではなく interface にすることで、 flag 等の追加時に runE の signature を破壊せずに後方互換に拡張できる (FLM_APP_0008)。 Stdin / Stdout / Stderr は service-level test (FLM_APP_0009) のため fake 化された stream を leaf に渡す経路で、 production では os.Stdin / os.Stdout / os.Stderr、 test では FakeIO 内の bytes.Reader / bytes.Buffer に解決される。 BoolFlag / StringFlag は WithCommandBoolFlag / WithCommandStringFlag で宣言された flag の値を返す経路で、 未宣言 flag を渡した場合は zero value が返る (= leaf 側 typo は flag 宣言と access 側の整合で AI レビュー / unit test が検出する)。
 type RunInput interface {
 	Args() []string
 	Stdin() io.Reader
 	Stdout() io.Writer
 	Stderr() io.Writer
+	BoolFlag(name string) bool
+	StringFlag(name string) string
 }
 
 type runInput struct {
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
-	args   []string
+	stdin       io.Reader
+	stdout      io.Writer
+	stderr      io.Writer
+	boolFlags   map[string]bool
+	stringFlags map[string]string
+	args        []string
 }
 
 var _ RunInput = (*runInput)(nil)
 
-func (r *runInput) Args() []string    { return r.args }
-func (r *runInput) Stdin() io.Reader  { return r.stdin }
-func (r *runInput) Stdout() io.Writer { return r.stdout }
-func (r *runInput) Stderr() io.Writer { return r.stderr }
+func (r *runInput) Args() []string                { return r.args }
+func (r *runInput) Stdin() io.Reader              { return r.stdin }
+func (r *runInput) Stdout() io.Writer             { return r.stdout }
+func (r *runInput) Stderr() io.Writer             { return r.stderr }
+func (r *runInput) BoolFlag(name string) bool     { return r.boolFlags[name] }
+func (r *runInput) StringFlag(name string) string { return r.stringFlags[name] }
+
+type boolFlagSpec struct {
+	name      string
+	shorthand string
+	usage     string
+	value     bool
+}
+
+type stringFlagSpec struct {
+	name      string
+	shorthand string
+	value     string
+	usage     string
+}
 
 type commandConfig struct {
-	runE  func(ctx context.Context, in RunInput) error
-	use   string
-	short string
+	runE        func(ctx context.Context, in RunInput) error
+	use         string
+	short       string
+	boolFlags   []boolFlagSpec
+	stringFlags []stringFlagSpec
 }
 
 type commandOption func(*commandConfig)
@@ -103,11 +125,27 @@ func WithCommandRunE(runE func(ctx context.Context, in RunInput) error) commandO
 	return func(c *commandConfig) { c.runE = runE }
 }
 
+// WithCommandBoolFlag は leaf 用の bool flag を宣言する。 宣言された flag は cobra の long / short flag として認識され、 spec emission (FLM_FEA_0004) の入力にも乗る。 leaf 側は RunInput.BoolFlag(name) で値を取得する。
+func WithCommandBoolFlag(name, shorthand string, value bool, usage string) commandOption {
+	return func(c *commandConfig) {
+		c.boolFlags = append(c.boolFlags, boolFlagSpec{name: name, shorthand: shorthand, value: value, usage: usage})
+	}
+}
+
+// WithCommandStringFlag は leaf 用の string flag を宣言する。 cobra の long / short flag として認識され、 spec emission の入力にも乗る。 leaf 側は RunInput.StringFlag(name) で値を取得する。
+func WithCommandStringFlag(name, shorthand, value, usage string) commandOption {
+	return func(c *commandConfig) {
+		c.stringFlags = append(c.stringFlags, stringFlagSpec{name: name, shorthand: shorthand, value: value, usage: usage})
+	}
+}
+
 func NewCommandConfig(use string, opts ...commandOption) *commandConfig {
 	c := &commandConfig{
-		runE:  nil,
-		use:   use,
-		short: "",
+		runE:        nil,
+		use:         use,
+		short:       "",
+		boolFlags:   nil,
+		stringFlags: nil,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -199,17 +237,67 @@ func buildSubcommandCobra(cfg *commandConfig) *cobra.Command {
 	cmd := newCobraCommand()
 	cmd.Use = cfg.use
 	cmd.Short = cfg.short
+	for _, f := range cfg.boolFlags {
+		cmd.Flags().BoolP(f.name, f.shorthand, f.value, f.usage)
+	}
+	for _, f := range cfg.stringFlags {
+		cmd.Flags().StringP(f.name, f.shorthand, f.value, f.usage)
+	}
 	if cfg.runE != nil {
 		runE := cfg.runE
+		boolFlagNames := collectBoolFlagNames(cfg.boolFlags)
+		stringFlagNames := collectStringFlagNames(cfg.stringFlags)
 		// cobra の SetIn / SetOut / SetErr は親 command (= clix root) で IO 由来の stream を注入済 (FLM_APP_0009 §service-level test の writer 注入経路)。 InOrStdin / OutOrStdout / ErrOrStderr は親から伝搬した stream を返すため、 production では os.Stdin / os.Stdout / os.Stderr、 test では FakeIO の bytes.Reader / bytes.Buffer が leaf に渡る。
 		cmd.RunE = func(c *cobra.Command, args []string) error {
+			bf, sf, err := harvestFlags(c, boolFlagNames, stringFlagNames)
+			if err != nil {
+				return err
+			}
 			return runE(c.Context(), &runInput{
-				args:   args,
-				stdin:  c.InOrStdin(),
-				stdout: c.OutOrStdout(),
-				stderr: c.ErrOrStderr(),
+				args:        args,
+				stdin:       c.InOrStdin(),
+				stdout:      c.OutOrStdout(),
+				stderr:      c.ErrOrStderr(),
+				boolFlags:   bf,
+				stringFlags: sf,
 			})
 		}
 	}
 	return cmd
+}
+
+func collectBoolFlagNames(specs []boolFlagSpec) []string {
+	names := make([]string, len(specs))
+	for i, f := range specs {
+		names[i] = f.name
+	}
+	return names
+}
+
+func collectStringFlagNames(specs []stringFlagSpec) []string {
+	names := make([]string, len(specs))
+	for i, f := range specs {
+		names[i] = f.name
+	}
+	return names
+}
+
+func harvestFlags(c *cobra.Command, boolNames, stringNames []string) (boolFlags map[string]bool, stringFlags map[string]string, err error) { //nolint:nonamedreturns // gocritic unnamedResult: 戻り値 3 つの意味を named return で明示。
+	boolFlags = make(map[string]bool, len(boolNames))
+	for _, n := range boolNames {
+		v, getErr := c.Flags().GetBool(n)
+		if getErr != nil {
+			return nil, nil, ex.Wrapf(getErr, "get bool flag %q", n)
+		}
+		boolFlags[n] = v
+	}
+	stringFlags = make(map[string]string, len(stringNames))
+	for _, n := range stringNames {
+		v, getErr := c.Flags().GetString(n)
+		if getErr != nil {
+			return nil, nil, ex.Wrapf(getErr, "get string flag %q", n)
+		}
+		stringFlags[n] = v
+	}
+	return boolFlags, stringFlags, nil
 }
