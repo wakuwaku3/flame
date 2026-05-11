@@ -429,19 +429,95 @@ func TestRun(t *testing.T) {
 			clix.WithCommandRunE(func(_ context.Context, _ clix.RunInput) error { return nil }),
 		)))
 		fake := clix.NewFakeIO(t, []string{"__spec"})
+		const expectedSpecJSON = `{
+  "name": "demo",
+  "path": "demo",
+  "subcommands": [
+    {
+      "name": "completion",
+      "path": "demo completion",
+      "subcommands": [
+        {
+          "name": "bash",
+          "path": "demo completion bash",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "fish",
+          "path": "demo completion fish",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "powershell",
+          "path": "demo completion powershell",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "zsh",
+          "path": "demo completion zsh",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "flags": []
+    },
+    {
+      "name": "flagged",
+      "path": "demo flagged",
+      "subcommands": [],
+      "flags": [
+        {
+          "name": "source",
+          "shorthand": "s",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "yes",
+          "shorthand": "y",
+          "type": "bool",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "flags": []
+}
+`
 
 		// Act
 		err := r.Run(t.Context(), fake)
 
 		// Assert
 		require.NoError(t, err)
-		out := fake.StdoutString(t)
-		assert.Contains(t, out, `"name": "yes"`)
-		assert.Contains(t, out, `"shorthand": "y"`)
-		assert.Contains(t, out, `"type": "bool"`)
-		assert.Contains(t, out, `"name": "source"`)
-		assert.Contains(t, out, `"shorthand": "s"`)
-		assert.Contains(t, out, `"type": "string"`)
+		fake.Verify(t, expectedSpecJSON, "")
 	})
 }
 

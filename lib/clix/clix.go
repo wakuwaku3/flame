@@ -125,14 +125,12 @@ func WithCommandRunE(runE func(ctx context.Context, in RunInput) error) commandO
 	return func(c *commandConfig) { c.runE = runE }
 }
 
-// WithCommandBoolFlag は leaf 用の bool flag を宣言する。 宣言された flag は cobra の long / short flag として認識され、 spec emission (FLM_FEA_0004) の入力にも乗る。 leaf 側は RunInput.BoolFlag(name) で値を取得する。
 func WithCommandBoolFlag(name, shorthand string, value bool, usage string) commandOption {
 	return func(c *commandConfig) {
 		c.boolFlags = append(c.boolFlags, boolFlagSpec{name: name, shorthand: shorthand, value: value, usage: usage})
 	}
 }
 
-// WithCommandStringFlag は leaf 用の string flag を宣言する。 cobra の long / short flag として認識され、 spec emission の入力にも乗る。 leaf 側は RunInput.StringFlag(name) で値を取得する。
 func WithCommandStringFlag(name, shorthand, value, usage string) commandOption {
 	return func(c *commandConfig) {
 		c.stringFlags = append(c.stringFlags, stringFlagSpec{name: name, shorthand: shorthand, value: value, usage: usage})
@@ -167,7 +165,6 @@ func (c *command) AddSubcommand(child Subcommand) {
 	c.cmd.AddCommand(child.cobra())
 }
 
-// NewLeaf は実行可能な leaf subcommand を Subcommand 値として返す syntactic sugar。 各 leaf subcommand package が `New() clix.Subcommand` を 1 行で実装するための helper ([FLM_APP_0008](../../../docs/adr/application/FLM_APP_0008__cli.md) §subcommand package の階層)。
 func NewLeaf(use, short string, runE func(ctx context.Context, in RunInput) error) Subcommand {
 	return NewCommand(NewCommandConfig(use,
 		WithCommandShort(short),
