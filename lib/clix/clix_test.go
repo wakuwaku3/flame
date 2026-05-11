@@ -293,6 +293,232 @@ func TestRun(t *testing.T) {
 		require.ErrorIs(t, err, sentinel)
 		assert.Equal(t, []string{"alpha", "beta"}, captured)
 	})
+
+	t.Run("WithCommandBoolFlag で宣言した bool flag が long / short 両形式で渡せる", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var captured bool
+		r := clix.NewRoot(clix.NewRootConfig("demo", "1.0.0"))
+		r.AddCommand(clix.NewCommand(clix.NewCommandConfig(
+			"flagged",
+			clix.WithCommandBoolFlag("yes", "y", false, "skip prompts"),
+			clix.WithCommandRunE(func(_ context.Context, in clix.RunInput) error {
+				captured = in.BoolFlag("yes")
+				return nil
+			}),
+		)))
+		fake := clix.NewFakeIO(t, []string{"flagged", "-y"})
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		require.NoError(t, err)
+		assert.True(t, captured)
+	})
+
+	t.Run("WithCommandBoolFlag 未指定時は default 値 (false) が返る", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var captured bool
+		r := clix.NewRoot(clix.NewRootConfig("demo", "1.0.0"))
+		r.AddCommand(clix.NewCommand(clix.NewCommandConfig(
+			"flagged",
+			clix.WithCommandBoolFlag("yes", "y", false, "skip prompts"),
+			clix.WithCommandRunE(func(_ context.Context, in clix.RunInput) error {
+				captured = in.BoolFlag("yes")
+				return nil
+			}),
+		)))
+		fake := clix.NewFakeIO(t, []string{"flagged"})
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		require.NoError(t, err)
+		assert.False(t, captured)
+	})
+
+	t.Run("WithCommandStringFlag で宣言した string flag に --name value 形式で渡せる", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var captured string
+		r := clix.NewRoot(clix.NewRootConfig("demo", "1.0.0"))
+		r.AddCommand(clix.NewCommand(clix.NewCommandConfig(
+			"flagged",
+			clix.WithCommandStringFlag("source", "", "default-src", "source override"),
+			clix.WithCommandRunE(func(_ context.Context, in clix.RunInput) error {
+				captured = in.StringFlag("source")
+				return nil
+			}),
+		)))
+		fake := clix.NewFakeIO(t, []string{"flagged", "--source", "github.com/x/y"})
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		require.NoError(t, err)
+		assert.Equal(t, "github.com/x/y", captured)
+	})
+
+	t.Run("WithCommandStringFlag 未指定時は default 値が返る", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var captured string
+		r := clix.NewRoot(clix.NewRootConfig("demo", "1.0.0"))
+		r.AddCommand(clix.NewCommand(clix.NewCommandConfig(
+			"flagged",
+			clix.WithCommandStringFlag("source", "", "default-src", "source override"),
+			clix.WithCommandRunE(func(_ context.Context, in clix.RunInput) error {
+				captured = in.StringFlag("source")
+				return nil
+			}),
+		)))
+		fake := clix.NewFakeIO(t, []string{"flagged"})
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		require.NoError(t, err)
+		assert.Equal(t, "default-src", captured)
+	})
+
+	t.Run("未宣言 flag を BoolFlag / StringFlag で参照すると zero value が返る", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var capturedBool bool
+		var capturedStr string
+		r := clix.NewRoot(clix.NewRootConfig("demo", "1.0.0"))
+		r.AddCommand(clix.NewLeaf(
+			"no-flags",
+			"no flags declared",
+			func(_ context.Context, in clix.RunInput) error {
+				capturedBool = in.BoolFlag("nonexistent")
+				capturedStr = in.StringFlag("nonexistent")
+				return nil
+			},
+		))
+		fake := clix.NewFakeIO(t, []string{"no-flags"})
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		require.NoError(t, err)
+		assert.False(t, capturedBool)
+		assert.Empty(t, capturedStr)
+	})
+
+	t.Run("__spec が WithCommandBoolFlag / WithCommandStringFlag で宣言された flag を surface に含める", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		r := clix.NewRoot(clix.NewRootConfig("demo", "1.0.0"))
+		r.AddCommand(clix.NewCommand(clix.NewCommandConfig(
+			"flagged",
+			clix.WithCommandBoolFlag("yes", "y", false, "skip prompts"),
+			clix.WithCommandStringFlag("source", "s", "", "source override"),
+			clix.WithCommandRunE(func(_ context.Context, _ clix.RunInput) error { return nil }),
+		)))
+		fake := clix.NewFakeIO(t, []string{"__spec"})
+		const expectedSpecJSON = `{
+  "name": "demo",
+  "path": "demo",
+  "subcommands": [
+    {
+      "name": "completion",
+      "path": "demo completion",
+      "subcommands": [
+        {
+          "name": "bash",
+          "path": "demo completion bash",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "fish",
+          "path": "demo completion fish",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "powershell",
+          "path": "demo completion powershell",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        },
+        {
+          "name": "zsh",
+          "path": "demo completion zsh",
+          "subcommands": [],
+          "flags": [
+            {
+              "name": "no-descriptions",
+              "type": "bool",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "flags": []
+    },
+    {
+      "name": "flagged",
+      "path": "demo flagged",
+      "subcommands": [],
+      "flags": [
+        {
+          "name": "source",
+          "shorthand": "s",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "yes",
+          "shorthand": "y",
+          "type": "bool",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "flags": []
+}
+`
+
+		// Act
+		err := r.Run(t.Context(), fake)
+
+		// Assert
+		require.NoError(t, err)
+		fake.Verify(t, expectedSpecJSON, "")
+	})
 }
 
 // fakeTBRecorder は testing.TB の Fatalf 呼び出しを捕捉するための test 用 stub。
