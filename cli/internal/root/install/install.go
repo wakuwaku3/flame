@@ -262,7 +262,6 @@ func formatConflictError(installPath string, conflicts []MergeConflict) error {
 	return ex.Errorf("%s", b.String())
 }
 
-
 func sortLockFiles(lock *Lock) {
 	sort.SliceStable(lock.Files, func(i, j int) bool {
 		return lock.Files[i].Install < lock.Files[j].Install

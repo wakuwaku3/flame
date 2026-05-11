@@ -34,14 +34,14 @@ type LockInstalled struct {
 	TreeHash string `yaml:"tree_hash,omitempty"`
 }
 
-// LockFile は flame.lock.files[] の 1 entry。 install copy 経路で配置された各ファイルのレコード。 vendor_content は 3-way merge の base (= 前回 install 時点の vendor file 内容 snapshot) として用いる。
+// LockFile は flame.lock.files[] の 1 entry。 install copy 経路で配置された各ファイルのレコード。 vendor_content は 3-way merge の base (= 前回 install 時点の vendor file 内容 snapshot) として用いる。 fieldalignment 最適化のため pointer (Overlay) を先頭に置き GC scan 範囲を縮減する。
 type LockFile struct {
+	Overlay       *LockOverlay  `yaml:"overlay,omitempty"`
 	Install       string        `yaml:"install"`
 	Vendor        string        `yaml:"vendor"`
 	Merge         MergeStrategy `yaml:"merge"`
 	Content       string        `yaml:"content"`
 	VendorContent string        `yaml:"vendor_content,omitempty"`
-	Overlay       *LockOverlay  `yaml:"overlay,omitempty"`
 }
 
 // LockEmbed は flame.lock.embeds[] の 1 entry。 取り込み形式 (CLAUDE.md / .envrc / .yamllint) の install 先と vendor target / 取り込み snippet を記録する (FLM_GEN_0007 §repo root における downstream resource の取り込み形式)。
