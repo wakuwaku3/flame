@@ -26,10 +26,8 @@ import (
 	"github.com/wakuwaku3/flame/lib/ex"
 )
 
-// CheckerFunc は 1 checker の起動契約。 cli/internal/root/check/* の各 package が export する Run と同じ signature。 dispatcher は registry 経由で適切な実装に振り分ける。
 type CheckerFunc = func(ctx context.Context, in clix.RunInput) error
 
-// Registry は bucketize の Checker 名を Go ネイティブ checker の Run 関数に対応付ける。 `flame check run <key>` は本 registry を経由して 1 checker を起動し、 Dispatch は entry list の各 Checker キーを並列に lookup する。
 var Registry = map[string]CheckerFunc{
 	bucketize.CheckerDocument:      document.Run,
 	bucketize.CheckerADR:           adr.Run,
@@ -114,7 +112,9 @@ type checkerIO struct {
 
 var _ clix.RunInput = (*checkerIO)(nil)
 
-func (c *checkerIO) Args() []string    { return c.args }
-func (c *checkerIO) Stdin() io.Reader  { return c.stdin }
-func (c *checkerIO) Stdout() io.Writer { return c.stdout }
-func (c *checkerIO) Stderr() io.Writer { return c.stderr }
+func (c *checkerIO) Args() []string           { return c.args }
+func (c *checkerIO) Stdin() io.Reader         { return c.stdin }
+func (c *checkerIO) Stdout() io.Writer        { return c.stdout }
+func (c *checkerIO) Stderr() io.Writer        { return c.stderr }
+func (*checkerIO) BoolFlag(_ string) bool     { return false }
+func (*checkerIO) StringFlag(_ string) string { return "" }

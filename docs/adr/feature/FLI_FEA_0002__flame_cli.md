@@ -21,12 +21,13 @@ flame CLI (= flame コマンド、 配布対象 single binary) を [FLM_FEA_0005
 
 ### flame の責務カテゴリ具体 list
 
-flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §責務範囲) は flame では以下の 4 種を持つ。 これらが [FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §サブコマンド体系の分割軸 にいう「責務カテゴリでの上位グルーピング」 の具体集合となる。
+flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §責務範囲) は flame では以下の 5 種を持つ。 これらが [FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §サブコマンド体系の分割軸 にいう「責務カテゴリでの上位グルーピング」 の具体集合となる。
 
 - **静的検査**: [FLM_FEA_0001](../../../vendor/flame/docs/adr/feature/FLM_FEA_0001__checker.md) の checker 本体実装と、 変更ファイルから (checker, target) ペアへの解決 (classifier)
 - **AI hook**: Claude Code の Stop / PreToolUse hook の本体実装。 hook が emit する block / approve 等の判定ロジック
 - **CI 補助**: GitHub Actions ワークフロー yaml に inline で書ききれない処理 (変更ファイル抽出、 結果集約、 release notes 生成、 配布対象 enumerate、 path-based label 付与等)
 - **devbox 補助**: devbox 環境の自己注入 (activate) や初回セットアップ (init)
+- **harness 導入補助**: 利用側 repo が flame harness を repo に取り込む工程の補助 (= `flame init` による `flame.yaml` の初期生成、 `flame install` による vendor SoT の同期)
 
 ### 実装規約
 
@@ -37,6 +38,27 @@ flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../..
 ### flame self での hook 設定
 
 [FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §shell が許される例外 で許容される trampoline を flame self では持たず、 Claude Code hook 設定 (`.claude/settings.json` および `.claude-plugin/hooks/hooks.json`) は **flame バイナリを直接起動する** 形を取る。 flame が PATH 解決可能であることを前提にできるのは flame self が source 提供元 ([FLM_GEN_0007](../../../vendor/flame/docs/adr/general/FLM_GEN_0007__resource_classification.md) §source 提供元の判定) であり、 hook 設定と flame バイナリのバージョン整合を repository 内で同期できるためである。 hook 仕様が shell 起動を強制する箇所では薄い trampoline shell が flame に処理を委譲する形で介在しうるが、 判定ロジックは flame CLI 側に置く。
+
+### flame init による flame.yaml の初期生成
+
+利用側 repository が flame harness を導入する初手として `flame init` subcommand を提供する。 [FLM_FEA_0003](../../../vendor/flame/docs/adr/feature/FLM_FEA_0003__harness.md) §導入手順 が `flame.yaml` の手動配置を前提にしていた経路を、 npm の `npm init` / cargo の `cargo init` と同じ慣習で CLI からの初期化に置き換える。 責務カテゴリは §flame の責務カテゴリ具体 list の「**harness 導入補助**」 に属する。
+
+挙動の規定:
+
+- 起動位置は **cwd 固定** (= `flame install` と同じく cwd 直下に `flame.yaml` を生成する。 上方向探索は行わない)
+- 既存 `flame.yaml` が cwd 直下にある場合は **上書きしない** で error 終了する。 利用者が削除 / move してから再実行する経路を取らせる
+- 既定で **対話モード** を取り、 `source` / `version` について現値を default として提示する。 利用者は Enter で default 採用、 任意の値を入力すれば override
+- `--yes` / `-y` flag で対話を skip し全 default 採用 (npm init の `-y` と同じ)
+- `--source <value>` / `--version <value>` flag で個別 default を override (該当 field の対話 prompt は skip される)
+- 非対話用途で flag を渡したくない場合は stdin の pipe でも代替できる (例: `printf '\n\n' | flame init` で全 default 採用)。 EOF は「Enter 押下と同じ = default 採用」 として扱う
+- 生成される `flame.yaml` には IDE 向け schema 参照 directive (`# yaml-language-server: $schema=./vendor/flame/schemas/flame.yaml.schema.yaml`) を先頭に付与する ([FLM_FEA_0003](../../../vendor/flame/docs/adr/feature/FLM_FEA_0003__harness.md) §schema の機械可読化)
+
+default 値の決定経路:
+
+- `flame.source` の default は **`github.com/wakuwaku3/flame`** (= 当該 binary が提供する harness の source 提供元 repo を固定値で記録する)
+- `flame.version` の default は **当該 `flame` binary 自身の version** (= `flame --version` で表示される値) を採用する。 release build では ldflags 経由で `vX.Y.Z` 形式の semver が埋め込まれているため、 init 後の `flame.yaml` の version は binary version と整合する。 dev build (= ldflags 未注入で `0.0.0-dev` の場合) は schema (`^v\d+\.\d+\.\d+$`) に conform しないため `v0.0.0` を placeholder として書き出し、 利用者が ADR の release 系 ([FLI_FEA_0001](FLI_FEA_0001__github_release.md)) で公開されている最新 tag に手動で書き換える経路を取らせる
+
+flame self 側 (= 当該 repo) の `flame.yaml` 初期生成は **scope 外** とする。 flame self の `flame.yaml` は version: self + 4 種 ignore directive を最低限宣言する固定形 ([FLM_FEA_0003](../../../vendor/flame/docs/adr/feature/FLM_FEA_0003__harness.md) §flame.yaml (manifest)) であり、 source 提供元 repo の vendor SoT が既に commit 済みである現状では `flame init` の再実行で生成する経路は存在しない (= 既に `flame.yaml` が repo に存在するため上書き禁止 error で停止する)。
 
 ## 影響
 
@@ -49,6 +71,8 @@ flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../..
 - 補助処理の発見性が `flame --help` に集約される。 開発者は scripts/ ツリーを走査せずに、 1 つの help ツリーで全体の補助処理を把握できる
 - 同種ロジック (変更ファイル抽出、 種別判定、 jq 依存の入力 parse 等) を Go の package として共有でき、 多経路重複が解消する
 - flame バイナリ自体の起動コスト (Go process startup + cobra parse) が hook / CI の各起動に乗る。 hook 起動回数の多い経路では応答時間に影響が出る
+- 利用側 repository は `flame init` で `flame.yaml` を初期化し、 引き続き `flame install` で vendor SoT を install 先に同期する 2 段階の経路で flame を導入できる ([FLM_FEA_0003](../../../vendor/flame/docs/adr/feature/FLM_FEA_0003__harness.md) §導入手順)。 `flame.yaml` の手動配置を起点としていた旧経路は init 経路に置き換わる
+- `flame init` の default `flame.version` が当該 binary 自身の version になるため、 利用側が古い flame binary で init すると古い version が `flame.yaml` に書かれる。 利用者が手動で binary を上げる経路と整合させる責務は利用側に残る (init 時点で latest tag を fetch する経路は採らない)
 
 ## 評価
 
@@ -58,6 +82,12 @@ flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../..
 - **flame CLI に業務アプリも含めて 1 binary に統合する**: 将来業務アプリを書くときに 1 binary でまとめる構成。 一方、 (1) flame は AI 開発の品質保証 harness としてのスコープを持ち、 業務アプリとは依存方向と release cycle が異なる、 (2) 業務アプリは独立した配布対象 (例: web サーバ・daemon) を持つことが想定される、 (3) [FLM_APP_0007](../../../vendor/flame/docs/adr/application/FLM_APP_0007__go.md) §配置 が main package を `cmd/<app_dir>/` に複数並列で置く規約をすでに持っており、 配布対象ごとに 1 main package を切る方が当該規約と整合する、 という不利益がある。 flame CLI は補助処理に責務を絞る方を採用した。
 - **flame self の Claude Code hook で trampoline shell を介在させる**: hook 設定と flame バイナリのバージョン整合を shell 側で吸収できる利点がある。 一方、 (1) flame self は source 提供元であり flame バイナリの取得経路を repository 内で完結できる、 (2) trampoline を挟むと判定ロジック以外の制御 (env 解決・引数組み立て等) が shell に滲み出やすい、 という不利益がある。 hook 設定から flame バイナリを直接起動し、 trampoline は外部仕様で強制される最小限のみに留める方を採用した。
 - **責務カテゴリの分類軸を flame self の既存 shell 構造と 1:1 対応で構成する**: 移行作業が機械的で済む利点がある。 一方、 (1) 既存 shell の分割は便宜的なもので、 サブコマンド体系として整合的に並ぶ保証がない、 (2) shell が消えた後にも CLI 体系だけが残るため、 shell の構造を引きずると不自然な階層が固定される、 という不利益がある。 [FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) の責務カテゴリ軸に従い、 既存 shell との対応は移行段階の過渡的な事実として扱う方を採用した。
+
+### `flame init` の default version 決定経路
+
+- **GitHub API で wakuwaku3/flame の latest release tag を fetch して default にする**: 利用者が常に最新 tag を `flame.yaml` に書き込めて、 古い binary で init しても最新 version で開始できる利点がある。 一方、 (1) init 時点で network 到達 / GitHub API rate limit / token 認可の依存が増え offline で init できなくなる、 (2) 利用者が手元で使っている binary version と manifest の version が乖離する状況を init で生み出すと、 直後の `flame install` が version bump 経路に入り「init だけしたつもりが vendor 再 fetch も走る」 という副作用が出る、 (3) flame の release は当該 binary 自体の version であり、 binary version を採用すれば独立した meta data 取得経路を持たずに整合する、 という不利益がある。 default を当該 binary 自身の version に固定する方を採用した。
+- **`flame init` を非対話 (= flag のみ) にする**: scripting で扱いやすく test も書きやすい利点があるが、 (1) `npm init` / `cargo init` / `git init` 等の慣習に反する、 (2) source / version の 2 fields だけでも初手の利用者は flag 構文を覚える必要が出る、 (3) `-y` skip で同じ非対話経路を提供できるため非対話用途も損なわない、 という不利益がある。 npm init と同じ「default 対話、 `-y` で skip、 個別 flag で override」 の 3 モードに揃える方を採用した。
+- **既存 `flame.yaml` を上書き / merge する経路を持つ**: 利用者が誤って init を再実行しても破壊が起きない利点がある。 一方、 (1) `flame.yaml` は手動編集対象 ([FLM_FEA_0003](../../../vendor/flame/docs/adr/feature/FLM_FEA_0003__harness.md) §flame.yaml (manifest)) であり、 利用者が編集済みの `flame.yaml` を init が上書きすると意図しない差分が混入する、 (2) merge は手動編集された field との衝突解決に複雑なロジックを要求する、 という不利益がある。 既存 `flame.yaml` がある場合は error 終了して利用者に判断を委ねる方を採用した。
 
 ## 過去経緯
 

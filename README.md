@@ -22,7 +22,23 @@ flame の private fork / mirror から install する場合は、 `GITHUB_TOKEN`
 
 ## 他リポジトリへの harness 導入
 
-flame CLI を install 後 (上記「flame CLI のインストール」)、 利用側 repo の root で以下を実行する。
+flame CLI を install 後 (上記「flame CLI のインストール」)、 利用側 repo の root で以下の 2 ステップを実行する。
+
+### 1. `flame init` — flame.yaml の初期生成
+
+cwd 直下に `flame.yaml` (= harness manifest) を新規生成する。 既存ファイルがあれば error 終了 (上書きしない)。
+
+```bash
+flame init           # 対話モード (source / version の default を順に prompt)
+flame init -y        # 対話 skip + 全 default で生成
+flame init --source github.com/<owner>/<fork> --version v1.1.0   # 個別 override
+```
+
+詳細は [FLI_FEA_0002 §flame init による flame.yaml の初期生成](docs/adr/feature/FLI_FEA_0002__flame_cli.md) を参照。
+
+### 2. `flame install` — vendor SoT の同期と harness 資産配置
+
+`flame.yaml` で指定した version の `vendor/flame/` を取得し、 install 経路 (config / hooks / lint / GitHub Actions / `CLAUDE.md` 等) を repo に配置する。 `flame.lock` が生成される。
 
 ```bash
 flame install

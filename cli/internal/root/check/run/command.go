@@ -25,7 +25,6 @@ func New() clix.Subcommand {
 	return clix.NewLeaf("run", "matrix entry を 1 checker に dispatch する (FILES_JSON env でファイル一覧を受ける)", Run)
 }
 
-// Run は <bucket-key> を引数に受け、 FILES_JSON env を JSON 配列としてパースし、 dispatch.Registry に登録された Run 関数に in-process で委譲する。 個別 checker が clix.NewExitError を返した場合は同 exit code を伝搬する。
 func Run(ctx context.Context, in clix.RunInput) error {
 	args := in.Args()
 	if len(args) != 1 {
@@ -69,7 +68,6 @@ func readFilesEnv() ([]string, error) {
 	return files, nil
 }
 
-// scopedInput は親 RunInput の stdin / stdout / stderr を継承しつつ Args だけを当該 checker 向けの files に置き換えた wrapper。
 type scopedInput struct {
 	base clix.RunInput
 	args []string
@@ -77,7 +75,9 @@ type scopedInput struct {
 
 var _ clix.RunInput = (*scopedInput)(nil)
 
-func (s *scopedInput) Args() []string    { return s.args }
-func (s *scopedInput) Stdin() io.Reader  { return s.base.Stdin() }
-func (s *scopedInput) Stdout() io.Writer { return s.base.Stdout() }
-func (s *scopedInput) Stderr() io.Writer { return s.base.Stderr() }
+func (s *scopedInput) Args() []string                { return s.args }
+func (s *scopedInput) Stdin() io.Reader              { return s.base.Stdin() }
+func (s *scopedInput) Stdout() io.Writer             { return s.base.Stdout() }
+func (s *scopedInput) Stderr() io.Writer             { return s.base.Stderr() }
+func (s *scopedInput) BoolFlag(name string) bool     { return s.base.BoolFlag(name) }
+func (s *scopedInput) StringFlag(name string) string { return s.base.StringFlag(name) }

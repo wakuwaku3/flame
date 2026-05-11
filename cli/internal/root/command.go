@@ -8,6 +8,7 @@ import (
 	"github.com/wakuwaku3/flame/cli/internal/root/check"
 	"github.com/wakuwaku3/flame/cli/internal/root/ci"
 	"github.com/wakuwaku3/flame/cli/internal/root/devbox"
+	"github.com/wakuwaku3/flame/cli/internal/root/initialize"
 	rootinstall "github.com/wakuwaku3/flame/cli/internal/root/install"
 	"github.com/wakuwaku3/flame/lib/clix"
 	"github.com/wakuwaku3/flame/lib/ex"
@@ -26,6 +27,7 @@ func Execute(ctx context.Context, io clix.IO) error {
 	r.AddCommand(devbox.New())
 	r.AddCommand(ai.New())
 	r.AddCommand(ci.New())
-	r.AddCommand(rootinstall.New()) //nolint:contextcheck // contextcheck が root 直下 leaf の closure chain を「ctx 未伝搬」 と誤検出する false positive。 install pkg 内は run(ctx, in) → Run(ctx, ...) → 全 IO 関数(ctx, ...) で ctx を完全伝搬しているが、 root 直下 leaf 特有のため group 経由 leaf (例: flame check go test) では発火しない (FLM_GEN_0006 §局所抑制が真に避けられない場合)。
+	r.AddCommand(initialize.New(Version)) //nolint:contextcheck // contextcheck が root 直下 leaf の closure chain を「ctx 未伝搬」 と誤検出する false positive (install pkg と同じ理由)。 initialize pkg 内は runLeaf(ctx, in, ...) → Run(ctx, ...) で ctx を完全伝搬している (FLM_GEN_0006 §局所抑制が真に避けられない場合)。
+	r.AddCommand(rootinstall.New())       //nolint:contextcheck // contextcheck が root 直下 leaf の closure chain を「ctx 未伝搬」 と誤検出する false positive。 install pkg 内は run(ctx, in) → Run(ctx, ...) → 全 IO 関数(ctx, ...) で ctx を完全伝搬しているが、 root 直下 leaf 特有のため group 経由 leaf (例: flame check go test) では発火しない (FLM_GEN_0006 §局所抑制が真に避けられない場合)。
 	return ex.Wrap(r.Run(ctx, io))
 }
