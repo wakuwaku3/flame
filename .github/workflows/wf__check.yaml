@@ -13,12 +13,12 @@
 #   - noop:    has_work=false 時の固定 success ジョブ (flame ci noop)
 #   - label:   wf__label.yaml への workflow_call で PR に module label 付与
 #              (PR 由来でない workflow_dispatch / fork PR は skip)
-#   - install_drift: PR head から flame CLI を build し `flame install` を
-#              起動 → `git diff --exit-code` で vendor / install copy / lock の
+#   - install_drift: release 配布された flame CLI で `flame install` を起動 →
+#              `git diff --exit-code` で vendor / install copy / lock の
 #              整合性を検査する (FLM_FEA_0003 §integrity check の install 経路)。
-#              flame self の場合 vendor SoT と install 先がズレないことを
-#              保証する gate。 利用側 repo でも CLI 改訂が drift を生まないこと
-#              を CI 段で検出する。
+#              FLI_APP_0001 §3 で source-build を禁止しているため、 cli 改修を
+#              伴う PR では PR head の install 実装は CI 段で自己検証できず、
+#              cli release 後の install_drift gate で確認する形になる。
 #   - summary: 上記の result を集約し branch protection 用の固定名 status
 #              として顕在化させる (= `check / summary`)
 #
@@ -130,27 +130,16 @@ jobs:
           repository: wakuwaku3/flame
           ref: main
           path: .flame-tool
-      # head build 経路は cli が depend する private Go module
-      # (`github.com/wakuwaku3/flame/lib`) の fetch に git の URL rewrite を
-      # 必要とするため、 flame CLI install よりも前に bootstrap として直接
-      # git config を入れる (`flame ci configure-go-auth` は flame CLI が無いと
-      # 起動できないため再現できず、 bootstrap 経路では git config 直書きを採用)。
-      - name: Configure git auth (bootstrap for private Go module fetch)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: git config --global "url.https://x-access-token:${GH_TOKEN}@github.com/.insteadOf" "https://github.com/"
-      # PR head に flame CLI ソース (cli/cmd/flame_tool/) が存在する場合 (= flame self
-      # repo の dogfooding 経路) は head から `go build` で flame CLI を生成する。
-      # PR が CLI 自体を変更している自己更新のケースで検査側に PR 内容を反映させる
-      # ため (= main の released binary は当該変更を未反映)。 利用側 repo (= flame
-      # self 以外) では cli/cmd/flame_tool/ が存在しないため、 main からの release
-      # asset 取得経路 (.flame-tool/cli/scripts/install.sh) にフォールバックする。
+      # flame CLI は main からの release asset (= `.flame-tool/cli/scripts/install.sh`)
+      # 経由のみで取得する。 PR head の source を `go build` で取り回す
+      # shortcut は FLI_APP_0001 §3 で禁止 (= module 配布対象の依存を
+      # release 経路に固定する)。 PR で cli 改修を行う場合は cli release を
+      # 待ってから wf 改修 PR を別途起こす。
       - name: Install flame CLI
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # yamllint disable-line rule:line-length
         run: |
-          if [[ -d cli/cmd/flame_tool ]]; then devbox run -- sh -c 'cd cli && go build -o ~/.local/bin/flame ./cmd/flame_tool'; else bash .flame-tool/cli/scripts/install.sh; fi
+          bash .flame-tool/cli/scripts/install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       # private な Go module fetch (cli が依存する `github.com/wakuwaku3/flame/lib`
       # 等) のため、 actions/checkout の repo-local 認証では届かない gopath
@@ -240,36 +229,29 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: ${{ inputs.head_sha }}
-      # PR head に同梱された Go toolchain で flame CLI を build する経路の
-      # 前段 (flame CLI 自体を変更する PR で head 反映を保証するため)。
+      # flame CLI installer を別 path で取得する (FLM_ENG_0003 §実体層: caller の作業ツリーに依存しない経路)。
+      - name: Checkout flame tool
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: wakuwaku3/flame
+          ref: main
+          path: .flame-tool
       - name: Install devbox
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # third-party action の SHA pin (40 文字 hex) は line-length 80 を必ず超過する。 改行で SHA を分割すると yaml string scalar として別文字列となり pin が壊れるため、 1 行で書き切る経路以外に表現が無い。 グローバル無効化は他 yaml の line-length 検出力を失うため局所抑制に倒す (FLM_GEN_0006 §局所抑制が真に避けられない場合のみ、 理由を併記して例外的に許す)。
         # yamllint disable-line rule:line-length
         uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7
-      - name: Configure git auth (bootstrap for private Go module fetch)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: git config --global "url.https://x-access-token:${GH_TOKEN}@github.com/.insteadOf" "https://github.com/"
-      # PR head に flame CLI ソース (cli/cmd/flame_tool/) が存在する flame self
-      # 経路では head の `go build` で binary を生成する (= PR 内容を検査側に
-      # 反映)。 利用側 repo (= cli/cmd/flame_tool/ 不在) では release 済 binary
-      # で代替するため install_drift の検査対象が「published flame」 になり、
-      # PR head の install 実装変更は反映されない (= 利用側 repo の install
-      # drift gate は published flame の挙動のみを観測する)。
-      - name: Build flame CLI from PR head
+      # flame CLI は main からの release asset (= `.flame-tool/cli/scripts/install.sh`)
+      # 経由のみで取得する (FLI_APP_0001 §3: workflow 内 source-build を禁止)。
+      # cli 改修を伴う PR では PR head の install 実装が CI 段で検証できなくなる
+      # ことを許容し、 cli release 後に install_drift gate で確認する運用とする
+      # (= release sequence の独立 PR 強制と引き換え)。
+      - name: Install flame CLI
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # if/else を 1 行で書く分岐 shell は line-length 80 を超過する。 改行で `if` body を分割すると ; や && 連鎖の意味が崩れる (= 中間 step の失敗が後続 step の継続を許す経路に化ける) ため、 fail-fast を保つには 1 行で書き切る必要がある (FLM_GEN_0006 §局所抑制が真に避けられない場合のみ、 理由を併記して例外的に許す)。
-        # yamllint disable-line rule:line-length
         run: |
-          if [[ -d cli/cmd/flame_tool ]]; then devbox run -- sh -c 'cd cli && go build -o ~/.local/bin/flame ./cmd/flame_tool'; else bash .flame-tool/cli/scripts/install.sh; fi
+          bash .flame-tool/cli/scripts/install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Configure git auth for private Go module fetch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: flame ci configure-go-auth
       # `flame install` を実行し、 vendor SoT と install 先の合成結果が
       # `flame.lock` および install path の現状と完全一致することを `git diff
       # --exit-code` で確認する。 idempotent でない (= drift を生む) 場合は
