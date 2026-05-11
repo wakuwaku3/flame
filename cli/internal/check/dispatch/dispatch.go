@@ -114,7 +114,9 @@ type checkerIO struct {
 
 var _ clix.RunInput = (*checkerIO)(nil)
 
-func (c *checkerIO) Args() []string    { return c.args }
-func (c *checkerIO) Stdin() io.Reader  { return c.stdin }
-func (c *checkerIO) Stdout() io.Writer { return c.stdout }
-func (c *checkerIO) Stderr() io.Writer { return c.stderr }
+func (c *checkerIO) Args() []string           { return c.args }
+func (c *checkerIO) Stdin() io.Reader         { return c.stdin }
+func (c *checkerIO) Stdout() io.Writer        { return c.stdout }
+func (c *checkerIO) Stderr() io.Writer        { return c.stderr }
+func (*checkerIO) BoolFlag(_ string) bool     { return false }
+func (*checkerIO) StringFlag(_ string) string { return "" }

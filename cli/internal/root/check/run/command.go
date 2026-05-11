@@ -77,7 +77,9 @@ type scopedInput struct {
 
 var _ clix.RunInput = (*scopedInput)(nil)
 
-func (s *scopedInput) Args() []string    { return s.args }
-func (s *scopedInput) Stdin() io.Reader  { return s.base.Stdin() }
-func (s *scopedInput) Stdout() io.Writer { return s.base.Stdout() }
-func (s *scopedInput) Stderr() io.Writer { return s.base.Stderr() }
+func (s *scopedInput) Args() []string                { return s.args }
+func (s *scopedInput) Stdin() io.Reader              { return s.base.Stdin() }
+func (s *scopedInput) Stdout() io.Writer             { return s.base.Stdout() }
+func (s *scopedInput) Stderr() io.Writer             { return s.base.Stderr() }
+func (s *scopedInput) BoolFlag(name string) bool     { return s.base.BoolFlag(name) }
+func (s *scopedInput) StringFlag(name string) string { return s.base.StringFlag(name) }
