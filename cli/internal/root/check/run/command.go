@@ -68,7 +68,6 @@ func readFilesEnv() ([]string, error) {
 	return files, nil
 }
 
-// scopedInput は親 RunInput の stdin / stdout / stderr を継承しつつ Args だけを当該 checker 向けの files に置き換えた wrapper。
 type scopedInput struct {
 	base clix.RunInput
 	args []string
