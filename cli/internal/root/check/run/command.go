@@ -25,7 +25,6 @@ func New() clix.Subcommand {
 	return clix.NewLeaf("run", "matrix entry を 1 checker に dispatch する (FILES_JSON env でファイル一覧を受ける)", Run)
 }
 
-// Run は <bucket-key> を引数に受け、 FILES_JSON env を JSON 配列としてパースし、 dispatch.Registry に登録された Run 関数に in-process で委譲する。 個別 checker が clix.NewExitError を返した場合は同 exit code を伝搬する。
 func Run(ctx context.Context, in clix.RunInput) error {
 	args := in.Args()
 	if len(args) != 1 {

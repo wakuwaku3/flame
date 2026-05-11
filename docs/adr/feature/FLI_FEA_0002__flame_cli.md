@@ -21,12 +21,13 @@ flame CLI (= flame コマンド、 配布対象 single binary) を [FLM_FEA_0005
 
 ### flame の責務カテゴリ具体 list
 
-flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §責務範囲) は flame では以下の 4 種を持つ。 これらが [FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §サブコマンド体系の分割軸 にいう「責務カテゴリでの上位グルーピング」 の具体集合となる。
+flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §責務範囲) は flame では以下の 5 種を持つ。 これらが [FLM_FEA_0005](../../../vendor/flame/docs/adr/feature/FLM_FEA_0005__cli_surface.md) §サブコマンド体系の分割軸 にいう「責務カテゴリでの上位グルーピング」 の具体集合となる。
 
 - **静的検査**: [FLM_FEA_0001](../../../vendor/flame/docs/adr/feature/FLM_FEA_0001__checker.md) の checker 本体実装と、 変更ファイルから (checker, target) ペアへの解決 (classifier)
 - **AI hook**: Claude Code の Stop / PreToolUse hook の本体実装。 hook が emit する block / approve 等の判定ロジック
 - **CI 補助**: GitHub Actions ワークフロー yaml に inline で書ききれない処理 (変更ファイル抽出、 結果集約、 release notes 生成、 配布対象 enumerate、 path-based label 付与等)
 - **devbox 補助**: devbox 環境の自己注入 (activate) や初回セットアップ (init)
+- **harness 導入補助**: 利用側 repo が flame harness を repo に取り込む工程の補助 (= `flame init` による `flame.yaml` の初期生成、 `flame install` による vendor SoT の同期)
 
 ### 実装規約
 
@@ -40,7 +41,7 @@ flame CLI が集約する補助処理の責務カテゴリ ([FLM_FEA_0005](../..
 
 ### flame init による flame.yaml の初期生成
 
-利用側 repository が flame harness を導入する初手として `flame init` subcommand を提供する。 [FLM_FEA_0003](../../../vendor/flame/docs/adr/feature/FLM_FEA_0003__harness.md) §導入手順 が `flame.yaml` の手動配置を前提にしていた経路を、 npm の `npm init` / cargo の `cargo init` と同じ慣習で CLI からの初期化に置き換える。 責務カテゴリは「**harness 導入補助**」 (= 利用側が repo に flame を取り込む工程の補助) として、 既存 4 種 (静的検査 / AI hook / CI 補助 / devbox 補助) と並ぶ第 5 種に位置付ける。
+利用側 repository が flame harness を導入する初手として `flame init` subcommand を提供する。 [FLM_FEA_0003](../../../vendor/flame/docs/adr/feature/FLM_FEA_0003__harness.md) §導入手順 が `flame.yaml` の手動配置を前提にしていた経路を、 npm の `npm init` / cargo の `cargo init` と同じ慣習で CLI からの初期化に置き換える。 責務カテゴリは §flame の責務カテゴリ具体 list の「**harness 導入補助**」 に属する。
 
 挙動の規定:
 

@@ -13,7 +13,6 @@ import (
 	"github.com/wakuwaku3/flame/cli/internal/root/initialize"
 )
 
-// TestRun は flame init endpoint の service-level test (FLM_APP_0009)。 cwd 固定 / 既存 flame.yaml の上書き禁止 / 対話モード / -y / --source / --version flag / default version 整形の各経路を検証する。
 func TestRun(t *testing.T) {
 	t.Parallel()
 
